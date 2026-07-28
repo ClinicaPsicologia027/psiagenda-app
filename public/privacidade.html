@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PsiAgenda — Política de Privacidade</title>
+<style>
+  body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:720px;margin:0 auto;padding:32px 20px 80px;color:#2b2b2b;line-height:1.6;}
+  h1{font-size:26px;margin-bottom:4px;}
+  h2{font-size:18px;margin-top:36px;}
+  .updated{color:#777;font-size:13px;margin-bottom:28px;}
+  ul{padding-left:20px;}
+  a{color:#4a3f8f;}
+</style>
+</head>
+<body>
+  <h1>Política de Privacidade — PsiAgenda</h1>
+  <div class="updated">Última atualização: 28 de julho de 2026</div>
+
+  <p>O PsiAgenda é um sistema de agendamento interno usado por uma clínica de psicologia para
+  organizar os horários de atendimento de suas profissionais. Esta página explica quais dados o
+  sistema trata e como eles são usados.</p>
+
+  <h2>Quais dados o PsiAgenda coleta</h2>
+  <ul>
+    <li>Dados de login da equipe (usuário, senha criptografada e perfil de acesso: admin, recepção ou profissional);</li>
+    <li>Nome e e-mail das profissionais cadastradas na clínica;</li>
+    <li>Horários de atendimento: data, hora de início e fim, nome do(a) paciente e observações da sessão, cadastrados pela recepção ou pela própria profissional.</li>
+  </ul>
+
+  <h2>Integração com o Google Agenda</h2>
+  <p>Se uma profissional optar por conectar sua conta do Google, o PsiAgenda solicita a permissão
+  <em>"Ver e editar eventos em todas as suas agendas"</em> (escopo
+  <code>https://www.googleapis.com/auth/calendar.events</code>) exclusivamente para:</p>
+  <ul>
+    <li>Criar um evento na agenda pessoal da profissional sempre que um novo horário for cadastrado no PsiAgenda para ela;</li>
+    <li>Atualizar esse evento se o horário, o(a) paciente ou as observações forem alterados;</li>
+    <li>Remover o evento caso o horário seja excluído no PsiAgenda.</li>
+  </ul>
+  <p>O PsiAgenda não lê, não acessa e não armazena nenhum outro evento já existente na agenda do
+  Google da profissional — ele só cria/edita/remove os eventos que ele mesmo gerou a partir dos
+  agendamentos da clínica.</p>
+
+  <h2>Onde os dados ficam armazenados</h2>
+  <p>Todos os dados de login, profissionais e horários ficam armazenados em um banco de dados
+  Supabase de uso exclusivo da clínica. O token de acesso ao Google (usado para criar os eventos)
+  também fica guardado nesse mesmo banco, de forma restrita ao servidor do PsiAgenda — ele nunca é
+  exposto ao navegador nem a terceiros.</p>
+
+  <h2>Compartilhamento com terceiros</h2>
+  <p>O PsiAgenda não vende, não compartilha e não usa os dados dos pacientes, das profissionais ou
+  da equipe para qualquer finalidade além do próprio funcionamento da agenda da clínica. Não há
+  publicidade, rastreamento ou venda de dados a terceiros.</p>
+
+  <h2>Como revogar o acesso ao Google Agenda</h2>
+  <p>A profissional pode revogar o acesso do PsiAgenda à sua conta do Google a qualquer momento em
+  <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>,
+  ou pedindo ao administrador da clínica para desconectar pelo próprio painel do PsiAgenda.</p>
+
+  <h2>Contato</h2>
+  <p>Dúvidas sobre esta política podem ser enviadas para o e-mail da administração da clínica
+  cadastrado no PsiAgenda.</p>
+</body>
+</html>
