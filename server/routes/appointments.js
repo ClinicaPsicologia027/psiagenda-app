@@ -2,12 +2,48 @@ const express = require('express');
 const router = express.Router();
 const dataStore = require('../dataStore');
 const { authenticate, requireRole } = require('../auth');
+const googleCal = require('../google');
 
 router.use(authenticate);
 
 function canAccessProf(user, profId) {
   if (user.role === 'profissional') return user.profissionalId === profId;
   return true; // admin e recepção acessam qualquer profissional
+}
+
+// Sincroniza com o Google Agenda da profissional (se ela tiver conectado).
+// É "melhor esforço": se der erro (token revogado, sem internet do Google, etc.)
+// o agendamento no PsiAgenda continua valendo normalmente — só registramos o erro.
+function eventPayload(appt) {
+  return {
+    summary: 'Sessão' + (appt.paciente ? ' — ' + appt.paciente : ''),
+    description: appt.obs || '',
+    date: appt.date, startTime: appt.horarioInicio, endTime: appt.horarioFim,
+  };
+}
+async function syncCreate(profId, appt) {
+  try {
+    const token = await dataStore.getProfessionalGoogleToken(profId);
+    if (!token) return;
+    const eventId = await googleCal.createEvent(token, eventPayload(appt));
+    await dataStore.setAppointmentGoogleEventId(appt.id, eventId);
+  } catch (e) { console.error('Google Agenda (criar):', e.message); }
+}
+async function syncUpdate(profId, appt) {
+  try {
+    if (!appt.googleEventId) return syncCreate(profId, appt);
+    const token = await dataStore.getProfessionalGoogleToken(profId);
+    if (!token) return;
+    await googleCal.updateEvent(token, appt.googleEventId, eventPayload(appt));
+  } catch (e) { console.error('Google Agenda (atualizar):', e.message); }
+}
+async function syncDelete(profId, appt) {
+  try {
+    if (!appt || !appt.googleEventId) return;
+    const token = await dataStore.getProfessionalGoogleToken(profId);
+    if (!token) return;
+    await googleCal.deleteEvent(token, appt.googleEventId);
+  } catch (e) { console.error('Google Agenda (excluir):', e.message); }
 }
 
 // Lista os horários de uma profissional num dia específico.
@@ -25,6 +61,7 @@ router.post('/:profId', requireRole('admin', 'recepcao'), async (req, res) => {
   if (!date || !horarioInicio || !horarioFim) return res.status(400).json({ error: 'Informe data, início e fim.' });
   try {
     const created = await dataStore.createAppointment(req.params.profId, date, horarioInicio, horarioFim, paciente || '', obs || '');
+    await syncCreate(req.params.profId, created);
     res.status(201).json(created);
   } catch (e) { res.status(502).json({ error: e.message }); }
 });
@@ -45,6 +82,7 @@ router.put('/:profId/:id', async (req, res) => {
   }
   try {
     const updated = await dataStore.updateAppointment(req.params.id, patch);
+    await syncUpdate(req.params.profId, updated);
     res.json(updated);
   } catch (e) { res.status(502).json({ error: e.message }); }
 });
@@ -52,7 +90,12 @@ router.put('/:profId/:id', async (req, res) => {
 // Remove um horário — só recepção e admin.
 router.delete('/:profId/:id', requireRole('admin', 'recepcao'), async (req, res) => {
   if (!canAccessProf(req.user, req.params.profId)) return res.status(403).json({ error: 'Sem permissão.' });
-  try { await dataStore.deleteAppointment(req.params.id); res.json({ ok: true }); }
+  try {
+    const existing = await dataStore.getAppointmentById(req.params.id);
+    await dataStore.deleteAppointment(req.params.id);
+    await syncDelete(req.params.profId, existing);
+    res.json({ ok: true });
+  }
   catch (e) { res.status(502).json({ error: e.message }); }
 });
 

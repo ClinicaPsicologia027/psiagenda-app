@@ -14,19 +14,19 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', requireRole('admin'), async (req, res) => {
-  const { nome } = req.body || {};
+  const { nome, email } = req.body || {};
   if (!nome) return res.status(400).json({ error: 'Informe o nome.' });
   const id = nome.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'prof-' + Date.now();
   try {
-    const prof = await dataStore.createProfessional({ id, nome });
+    const prof = await dataStore.createProfessional({ id, nome, email: (email || '').trim() });
     res.status(201).json(prof);
   } catch (e) { res.status(502).json({ error: e.message }); }
 });
 
 router.put('/:id', requireRole('admin'), async (req, res) => {
-  const { nome } = req.body || {};
+  const { nome, email } = req.body || {};
   try {
-    const updated = await dataStore.updateProfessional(req.params.id, { nome });
+    const updated = await dataStore.updateProfessional(req.params.id, { nome, email: (email || '').trim() });
     res.json(updated);
   } catch (e) { res.status(502).json({ error: e.message }); }
 });
