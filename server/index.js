@@ -25,6 +25,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/professionals', require('./routes/professionals'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/appointments', require('./routes/appointments'));
+app.use('/api/google', require('./routes/google'));
 
 // Front-end estático (a pasta public/ tem o app que o navegador do celular abre)
 app.use(express.static(path.join(__dirname, '..', 'public')));

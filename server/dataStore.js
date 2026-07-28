@@ -8,21 +8,29 @@ function must(error) {
 }
 
 /* ---------------- PROFISSIONAIS ---------------- */
+// "googleConnected" é derivado (não expomos o refresh_token pro front-end).
 function rowToProf(row) {
-  return { id: row.id, nome: row.nome };
+  return { id: row.id, nome: row.nome, email: row.email || '', googleConnected: !!row.google_refresh_token };
 }
+// Nunca inclui o google_refresh_token aqui — ele só é alterado pelas funções
+// específicas abaixo (setProfessionalGoogleToken), nunca por uma edição normal de nome/e-mail.
 function profToRow(p) {
-  return { id: p.id, nome: p.nome };
+  return { id: p.id, nome: p.nome, email: p.email || null };
 }
 async function getProfessionals() {
   const { data, error } = await supabase.from('profissionais').select('*').order('nome', { ascending: true });
   must(error);
   return (data || []).map(rowToProf);
 }
+async function getProfessionalById(id) {
+  const { data, error } = await supabase.from('profissionais').select('*').eq('id', id).maybeSingle();
+  must(error);
+  return data ? rowToProf(data) : null;
+}
 async function createProfessional(p) {
   const { error } = await supabase.from('profissionais').insert(profToRow(p));
   must(error);
-  return p;
+  return rowToProf(profToRow(p));
 }
 async function updateProfessional(id, patch) {
   const { data, error } = await supabase.from('profissionais').select('*').eq('id', id).maybeSingle();
@@ -37,6 +45,17 @@ async function updateProfessional(id, patch) {
 async function deleteProfessional(id) {
   const { error } = await supabase.from('profissionais').delete().eq('id', id);
   must(error);
+}
+// Guarda (ou remove, se token=null) o refresh_token do Google Agenda da profissional.
+async function setProfessionalGoogleToken(id, token) {
+  const { error } = await supabase.from('profissionais').update({ google_refresh_token: token }).eq('id', id);
+  must(error);
+}
+// Usado internamente (sync com o Google) — nunca sai numa resposta da API pro front-end.
+async function getProfessionalGoogleToken(id) {
+  const { data, error } = await supabase.from('profissionais').select('google_refresh_token').eq('id', id).maybeSingle();
+  must(error);
+  return data ? data.google_refresh_token : null;
 }
 
 /* ---------------- USUARIOS ---------------- */
@@ -89,6 +108,7 @@ function rowToAppt(row) {
     horarioFim: row.horario_fim,
     paciente: row.paciente || '',
     obs: row.obs || '',
+    googleEventId: row.google_event_id || null,
   };
 }
 async function getAppointmentsForProfDate(profId, date) {
@@ -98,6 +118,16 @@ async function getAppointmentsForProfDate(profId, date) {
     .order('horario_inicio', { ascending: true });
   must(error);
   return (data || []).map(rowToAppt);
+}
+async function getAppointmentById(id) {
+  const { data, error } = await supabase.from('agendamentos').select('*').eq('id', id).maybeSingle();
+  must(error);
+  return data ? rowToAppt(data) : null;
+}
+// Grava o id do evento criado no Google Agenda, pra poder atualizar/excluir depois.
+async function setAppointmentGoogleEventId(id, googleEventId) {
+  const { error } = await supabase.from('agendamentos').update({ google_event_id: googleEventId }).eq('id', id);
+  must(error);
 }
 async function createAppointment(profId, date, horarioInicio, horarioFim, paciente, obs) {
   const { data, error } = await supabase.from('agendamentos').insert({
@@ -127,7 +157,9 @@ async function deleteAppointment(id) {
 }
 
 module.exports = {
-  getProfessionals, createProfessional, updateProfessional, deleteProfessional,
+  getProfessionals, getProfessionalById, createProfessional, updateProfessional, deleteProfessional,
+  setProfessionalGoogleToken, getProfessionalGoogleToken,
   getUsers, findUserByUsername, createUser, updateUser, deleteUser,
-  getAppointmentsForProfDate, createAppointment, updateAppointment, deleteAppointment,
+  getAppointmentsForProfDate, getAppointmentById, createAppointment, updateAppointment, deleteAppointment,
+  setAppointmentGoogleEventId,
 };
