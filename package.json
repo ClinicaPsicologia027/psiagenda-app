@@ -1,0 +1,20 @@
+{
+  "name": "psiagenda-app",
+  "version": "1.0.0",
+  "description": "Agenda da clínica de psicologia — login por perfil, com o Supabase como banco de dados.",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "nanoid": "^3.3.16"
+  }
+}
