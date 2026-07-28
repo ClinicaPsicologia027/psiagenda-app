@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>PsiAgenda — Clínica</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F6F5F9;
+    --surface:#FFFFFF;
+    --surface-2:#EFECF5;
+    --primary:#4A4785;
+    --primary-dark:#2E2B5C;
+    --accent:#B9A9D9;
+    --accent-2:#C15C5C;
+    --text:#2A2640;
+    --muted:#746E8C;
+    --line:#E1DCEE;
+    --success:#6FA287;
+    --danger:#C15C5C;
+    --radius:14px;
+    --shadow:0 4px 18px rgba(46,43,92,0.10);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
+  h1,h2,h3,.display{font-family:'Fraunces',serif;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  button{font-family:inherit;cursor:pointer;}
+  input,select,textarea{font-family:inherit;}
+  #root{min-height:100vh;display:flex;flex-direction:column;max-width:480px;margin:0 auto;background:var(--bg);position:relative;}
+
+  /* marca psi */
+  .psi-badge{border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:600;color:var(--primary);position:relative;flex-shrink:0;}
+  .psi-badge.on-dark{background:rgba(255,255,255,0.12);color:#fff;}
+
+  /* ---- LOGIN ---- */
+  .login-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;background:
+    radial-gradient(circle at 20% 10%, rgba(74,71,133,0.10), transparent 55%),
+    radial-gradient(circle at 85% 85%, rgba(185,169,217,0.25), transparent 50%), var(--bg);}
+  .brand{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:30px;}
+  .brand-name{font-size:22px;font-weight:600;color:var(--primary-dark);letter-spacing:-0.01em;}
+  .login-card{width:100%;background:var(--surface);border-radius:20px;box-shadow:var(--shadow);padding:32px 26px;}
+  .login-card h1{font-size:24px;margin:0 0 6px;color:var(--primary-dark);font-weight:600;}
+  .login-card p.sub{margin:0 0 26px;color:var(--muted);font-size:14px;line-height:1.5;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;}
+  .field input,.field select,.field textarea{width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;background:var(--surface);color:var(--text);outline:none;transition:border-color .15s;resize:vertical;}
+  .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--primary);}
+  .field input:disabled{background:var(--surface-2);color:var(--muted);}
+  .btn-primary{width:100%;padding:13px;border:none;border-radius:10px;background:var(--primary);color:#fff;font-size:15px;font-weight:600;transition:background .15s, transform .1s;}
+  .btn-primary:hover{background:var(--primary-dark);}
+  .btn-primary:active{transform:scale(0.98);}
+  .btn-secondary{padding:11px 16px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);color:var(--text);font-size:14px;font-weight:600;}
+  .btn-secondary:hover{border-color:var(--primary);color:var(--primary-dark);}
+  .btn-ghost{background:none;border:none;color:var(--primary);font-weight:600;font-size:14px;padding:8px;}
+  .btn-danger{background:none;border:1.5px solid rgba(193,92,92,0.35);color:var(--danger);border-radius:8px;padding:6px 10px;font-size:12.5px;font-weight:600;}
+  .err-msg{background:rgba(193,92,92,0.08);border:1px solid rgba(193,92,92,0.25);color:var(--danger);font-size:13px;padding:10px 12px;border-radius:8px;margin-bottom:16px;}
+  .hint{margin-top:22px;text-align:center;color:var(--muted);font-size:12.5px;line-height:1.6;}
+
+  /* ---- APP SHELL ---- */
+  .topbar{background:var(--primary-dark);color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20;}
+  .topbar .who{display:flex;flex-direction:column;}
+  .topbar .who .name{font-size:14.5px;font-weight:600;}
+  .topbar .who .role{font-size:11px;color:rgba(255,255,255,0.65);text-transform:uppercase;letter-spacing:0.06em;margin-top:1px;}
+  .logout-btn{background:rgba(255,255,255,0.12);border:none;color:#fff;padding:8px 12px;border-radius:8px;font-size:12.5px;font-weight:600;}
+  .logout-btn:hover{background:rgba(255,255,255,0.22);}
+
+  .tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:64px;z-index:19;}
+  .tab-btn{flex:1;padding:13px 4px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2.5px solid transparent;}
+  .tab-btn.active{color:var(--primary-dark);border-bottom-color:var(--accent);}
+
+  .content{flex:1;padding:18px 16px 40px;}
+
+  /* calendar */
+  .cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .cal-header h2{margin:0;font-size:19px;color:var(--primary-dark);font-weight:600;}
+  .cal-nav-btn{width:34px;height:34px;border-radius:9px;border:1.5px solid var(--line);background:var(--surface);font-size:16px;color:var(--primary-dark);display:flex;align-items:center;justify-content:center;}
+  .cal-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;}
+  .cal-dow{text-align:center;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;padding-bottom:4px;}
+  .cal-day{aspect-ratio:1;border-radius:10px;background:var(--surface);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:var(--text);position:relative;}
+  .cal-day.empty{visibility:hidden;}
+  .cal-day.today{outline:2px solid var(--accent);}
+  .cal-day.selected{background:var(--primary);color:#fff;border-color:var(--primary);}
+
+  .back-link{display:inline-flex;align-items:center;gap:6px;color:var(--primary);font-weight:600;font-size:13.5px;background:none;border:none;padding:0 0 14px;}
+
+  .day-title{font-size:18px;font-weight:600;color:var(--primary-dark);margin:0 0 4px;}
+  .day-sub{color:var(--muted);font-size:13px;margin:0 0 18px;}
+
+  .prof-block{background:var(--surface);border-radius:16px;box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden;}
+  .avatar{width:30px;height:30px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;}
+
+  .slot{padding:14px 16px;border-top:1px solid var(--line);}
+  .slot-time-row{display:flex;align-items:center;gap:6px;margin-bottom:8px;}
+  .slot-time-input{width:64px;padding:6px 8px;border:1.5px solid var(--line);border-radius:7px;font-size:12.5px;font-family:'IBM Plex Mono',monospace;text-align:center;color:var(--primary-dark);background:var(--surface);}
+  .slot-time-input:disabled{background:var(--surface-2);color:var(--muted);border-style:dashed;}
+  .slot-time-static{padding:6px 10px;border-radius:7px;background:var(--surface-2);font-size:12.5px;font-family:'IBM Plex Mono',monospace;color:var(--muted);}
+  .slot-del-btn{width:26px;height:26px;border-radius:7px;border:1.5px solid var(--line);background:var(--surface);color:var(--danger);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+  .pat-input{width:100%;padding:9px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13.5px;background:var(--bg);color:var(--text);}
+  .pat-input:focus{outline:none;border-color:var(--primary);background:#fff;}
+  .obs-input{width:100%;margin-top:8px;padding:9px 11px;border:1.5px dashed var(--line);border-radius:8px;font-size:12.5px;color:var(--muted);background:transparent;}
+  .obs-input:focus{outline:none;border-color:var(--accent);color:var(--text);}
+  .save-flag{font-size:11px;color:var(--success);font-weight:600;margin-top:6px;opacity:0;transition:opacity .3s;}
+  .save-flag.show{opacity:1;}
+  .add-slot-row{padding:14px 16px;border-top:1px dashed var(--line);text-align:center;}
+  .add-slot-link{color:var(--primary);font-weight:600;font-size:13px;background:none;border:none;}
+
+  /* lists (profissionais/usuarios) */
+  .list-card{background:var(--surface);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .list-card .li-main{display:flex;align-items:center;gap:12px;}
+  .prof-select-card{width:100%;text-align:left;background:var(--surface);border:none;border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;font:inherit;color:inherit;}
+  .li-info .li-title{font-weight:600;font-size:14.5px;color:var(--text);}
+  .li-info .li-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+  .badge{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:0.04em;}
+  .badge.admin{background:rgba(193,92,92,0.12);color:var(--danger);}
+  .badge.profissional{background:rgba(74,71,133,0.12);color:var(--primary);}
+  .badge.recepcao{background:rgba(185,169,217,0.3);color:#5b4d82;}
+
+  .section-title{display:flex;align-items:center;justify-content:space-between;margin:20px 0 10px;}
+  .section-title h3{margin:0;font-size:15px;color:var(--primary-dark);}
+  .add-btn{background:var(--primary);color:#fff;border:none;border-radius:9px;padding:8px 13px;font-size:13px;font-weight:600;}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(46,43,92,0.45);display:flex;align-items:flex-end;justify-content:center;z-index:50;}
+  .modal{background:var(--surface);width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:24px 20px 30px;max-height:85vh;overflow-y:auto;}
+  .modal h3{margin:0 0 18px;color:var(--primary-dark);font-size:17px;}
+  .modal-actions{display:flex;gap:10px;margin-top:22px;}
+  .modal-actions .btn-primary{flex:1;}
+
+  .note-box{background:rgba(185,169,217,0.18);border:1px solid rgba(185,169,217,0.4);border-radius:10px;padding:11px 13px;font-size:12px;color:#5b4d82;line-height:1.5;margin-bottom:16px;}
+
+  .empty-state{text-align:center;padding:50px 20px;color:var(--muted);}
+  .empty-state .psi-badge{margin:0 auto 14px;width:56px;height:56px;font-size:26px;}
+
+  .loading-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--muted);font-size:13px;}
+  .spinner{width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--primary);border-radius:50%;animation:spin 0.8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  ::selection{background:rgba(185,169,217,0.45);}
+  *:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+/* ============== MARCA PSI ============== */
+function psiBadge(size, onDark){
+  const s = size || 30;
+  const fs = Math.round(s*0.55);
+  return `<div class="psi-badge ${onDark?'on-dark':''}" style="width:${s}px;height:${s}px;font-size:${fs}px;">Ψ</div>`;
+}
+
+/* ============== STATE ============== */
+let professionals = [];
+let users = [];
+let currentUser = null;
+let authToken = null;
+let apptsCache = {}; // "profId|date" -> array de horários [{id, horarioInicio, horarioFim, paciente, obs}]
+let view = { tab: 'agenda', screen: 'calendar', monthCursor: new Date(2026,6,1), selectedDate: null, selectedProfId: null, multiProfDay: false, editingProf: null, editingUser: null };
+let loading = true;
+let loginError = '';
+
+const DOW_ABBR = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const WEEK_DAYS = ['Seg','Ter','Qua','Qui','Sex'];
+const MONTH_NAMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+/* ============== API HELPERS ============== */
+async function api(path, options={}){
+  const headers = Object.assign({'Content-Type':'application/json'}, options.headers||{});
+  if(authToken) headers['Authorization'] = 'Bearer ' + authToken;
+  const res = await fetch('/api'+path, Object.assign({}, options, {headers}));
+  let body = null;
+  try{ body = await res.json(); }catch(e){ /* sem corpo */ }
+  if(!res.ok){
+    if(res.status===401){ logoutLocal(); }
+    throw new Error((body && body.error) || ('Erro na requisição ('+res.status+')'));
+  }
+  return body;
+}
+function logoutLocal(){
+  currentUser = null; authToken = null;
+  try{ localStorage.removeItem('psiagenda_token'); localStorage.removeItem('psiagenda_user'); }catch(e){}
+}
+
+async function loadClinicData(){
+  try{ professionals = await api('/professionals'); }catch(e){ professionals = []; }
+  if(currentUser.role==='admin'){
+    try{ users = await api('/users'); }catch(e){ users = []; }
+  }
+}
+async function loadAppts(profId, dateStr){
+  const list = await api('/appointments/'+profId+'/'+dateStr);
+  apptsCache[profId+'|'+dateStr] = list;
+  return list;
+}
+
+/* ============== UTIL ============== */
+function dateKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function dowAbbr(d){ return DOW_ABBR[d.getDay()]; }
+function initials(name){ return name.trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
+function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+
+/* ============== RENDER ROOT ============== */
+function render(){
+  const root = document.getElementById('root');
+  if(loading){ root.innerHTML = renderLoading(); return; }
+  if(!currentUser){ root.innerHTML = renderLogin(); attachLoginHandlers(); return; }
+  root.innerHTML = renderAppShell();
+  attachShellHandlers();
+}
+
+function renderLoading(){
+  return `<div class="loading-wrap"><div class="spinner"></div><div>Carregando agenda…</div></div>`;
+}
+
+/* ============== LOGIN ============== */
+function renderLogin(){
+  return `
+  <div class="login-wrap">
+    <div class="brand">
+      ${psiBadge(56)}
+      <span class="brand-name">PsiAgenda</span>
+    </div>
+    <div class="login-card">
+      <h1>Entrar</h1>
+      <p class="sub">Use o login e senha criados pela administração da clínica.</p>
+      ${loginError ? `<div class="err-msg">${loginError}</div>` : ''}
+      <form id="login-form">
+        <div class="field">
+          <label>Usuário</label>
+          <input type="text" id="login-user" autocomplete="username" placeholder="ex: dra.marina">
+        </div>
+        <div class="field">
+          <label>Senha</label>
+          <input type="password" id="login-pass" autocomplete="current-password" placeholder="••••••••">
+        </div>
+        <button type="button" id="login-btn" class="btn-primary">Entrar</button>
+      </form>
+      <div class="hint">Não tem acesso? Peça ao(à) profissional responsável<br>ou à administração da clínica para criar seu usuário.</div>
+    </div>
+  </div>`;
+}
+function attachLoginHandlers(){
+  const form = document.getElementById('login-form');
+  const userInput = document.getElementById('login-user');
+  const passInput = document.getElementById('login-pass');
+  const btn = document.getElementById('login-btn');
+
+  async function doLogin(){
+    try{
+      const u = (userInput.value || '').trim().toLowerCase();
+      const p = passInput.value || '';
+      if(!u || !p){ loginError = 'Preencha usuário e senha.'; render(); return; }
+      btn.textContent = 'Entrando…'; btn.disabled = true;
+      const res = await fetch('/api/auth/login', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({username:u, password:p})
+      });
+      const body = await res.json().catch(()=>({}));
+      if(!res.ok){
+        loginError = body.error || 'Usuário ou senha incorretos.';
+        btn.textContent = 'Entrar'; btn.disabled = false;
+        render();
+        return;
+      }
+      currentUser = body.user;
+      authToken = body.token;
+      try{
+        localStorage.setItem('psiagenda_token', authToken);
+        localStorage.setItem('psiagenda_user', JSON.stringify(currentUser));
+      }catch(e){ /* localStorage indisponível: sessão só dura enquanto a aba estiver aberta */ }
+      loginError = '';
+      view = { tab: 'agenda', screen:'calendar', monthCursor:new Date(2026,6,1), selectedDate:null, selectedProfId:null, multiProfDay:false, editingProf:null, editingUser:null };
+      loading = true; render();
+      await loadClinicData();
+      loading = false; render();
+    }catch(err){
+      loginError = 'Erro ao entrar: ' + (err && err.message ? err.message : String(err));
+      btn.textContent = 'Entrar'; btn.disabled = false;
+      render();
+    }
+  }
+
+  btn.addEventListener('click', doLogin);
+  form.addEventListener('submit', e=>{ e.preventDefault(); doLogin(); });
+  [userInput, passInput].forEach(inp=>{
+    inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); doLogin(); } });
+  });
+}
+
+/* ============== APP SHELL ============== */
+function renderAppShell(){
+  const roleLabel = {admin:'Administrador(a)', profissional:'Profissional', recepcao:'Recepção'}[currentUser.role];
+  let tabs = '';
+  if(currentUser.role==='admin'){
+    tabs = tabBtn('agenda','Agenda') + tabBtn('profissionais','Profissionais') + tabBtn('usuarios','Usuários');
+  } else if(currentUser.role==='recepcao'){
+    tabs = tabBtn('agenda','Agenda') + tabBtn('profissionais','Profissionais');
+  } else {
+    tabs = tabBtn('agenda','Minha agenda');
+  }
+  return `
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:10px;">
+        ${psiBadge(30, true)}
+        <div class="who"><div class="name">${currentUser.nome}</div><div class="role">${roleLabel}</div></div>
+      </div>
+      <button class="logout-btn" id="logout-btn">Sair</button>
+    </div>
+    <div class="tabs">${tabs}</div>
+    <div class="content" id="content">${renderTabContent()}</div>
+  `;
+}
+function tabBtn(key,label){
+  return `<button class="tab-btn ${view.tab===key?'active':''}" data-tab="${key}">${label}</button>`;
+}
+function attachShellHandlers(){
+  document.getElementById('logout-btn').addEventListener('click', ()=>{ logoutLocal(); apptsCache={}; render(); });
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      view.tab = btn.dataset.tab; view.screen='calendar'; view.selectedDate=null; view.selectedProfId=null; view.multiProfDay=false;
+      render();
+    });
+  });
+  attachTabContentHandlers();
+}
+
+function renderTabContent(){
+  if(view.tab==='agenda') return renderAgendaTab();
+  if(view.tab==='profissionais') return renderProfissionaisTab();
+  if(view.tab==='usuarios') return renderUsuariosTab();
+  return '';
+}
+function attachTabContentHandlers(){
+  if(view.tab==='agenda') attachAgendaHandlers();
+  if(view.tab==='profissionais') attachProfissionaisHandlers();
+  if(view.tab==='usuarios') attachUsuariosHandlers();
+}
+
+/* ============== AGENDA TAB ============== */
+function visibleProfessionals(){
+  if(currentUser.role==='profissional'){
+    return professionals.filter(p=>p.id===currentUser.profissionalId);
+  }
+  return professionals;
+}
+function canEditHorarios(){
+  return currentUser.role==='admin' || currentUser.role==='recepcao';
+}
+
+function renderAgendaTab(){
+  if(view.screen==='day' && view.selectedDate){
+    return renderDayView();
+  }
+  if(view.screen==='profSelect' && view.selectedDate){
+    return renderProfSelectView();
+  }
+  return renderCalendarView();
+}
+
+function startOfWeekMonday(d){
+  const wd = (d.getDay()+6)%7; // 0=Mon..6=Sun
+  const res = new Date(d.getFullYear(), d.getMonth(), d.getDate()-wd);
+  return res;
+}
+
+function renderCalendarView(){
+  const cursor = view.monthCursor;
+  const label = MONTH_NAMES[cursor.getMonth()] + ' de ' + cursor.getFullYear();
+  const firstOfMonth = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+  const lastOfMonth = new Date(cursor.getFullYear(), cursor.getMonth()+1, 0);
+  const gridStart = startOfWeekMonday(firstOfMonth);
+  const gridEndMonday = startOfWeekMonday(lastOfMonth);
+  const gridEnd = new Date(gridEndMonday.getFullYear(), gridEndMonday.getMonth(), gridEndMonday.getDate()+4);
+
+  let cells = '';
+  for(let d = new Date(gridStart); d<=gridEnd; d.setDate(d.getDate()+1)){
+    const wd = d.getDay();
+    if(wd===0 || wd===6) continue;
+    if(d.getMonth()!==cursor.getMonth()){
+      cells += `<div class="cal-day empty"></div>`;
+      continue;
+    }
+    const isToday = dateKey(d)===dateKey(new Date());
+    cells += `<button class="cal-day ${isToday?'today':''}" data-date="${dateKey(d)}">${d.getDate()}</button>`;
+  }
+
+  const emptyMsg = visibleProfessionals().length===0
+    ? (currentUser.role==='admin'
+        ? `<div class="empty-state">${psiBadge(56)}<div>Ainda não há profissionais cadastrados(as).<br>Vá na aba <strong>Profissionais</strong> para adicionar.</div></div>`
+        : `<div class="empty-state">${psiBadge(56)}<div>Nenhuma profissional vinculada a este usuário ainda.<br>Fale com a administração.</div></div>`)
+    : '';
+
+  return `
+    <div class="cal-header">
+      <button class="cal-nav-btn" id="prev-month">‹</button>
+      <h2 class="display">${label}</h2>
+      <button class="cal-nav-btn" id="next-month">›</button>
+    </div>
+    <div class="cal-grid">
+      ${WEEK_DAYS.map(d=>`<div class="cal-dow">${d}</div>`).join('')}
+      ${cells}
+    </div>
+    ${emptyMsg}
+  `;
+}
+
+function renderProfSelectView(){
+  const d = view.selectedDate;
+  const dateLabel = cap(d.toLocaleDateString('pt-BR',{weekday:'long', day:'2-digit', month:'long', year:'numeric'}));
+  const profs = visibleProfessionals();
+
+  if(profs.length===0){
+    return `
+      <button class="back-link" id="back-to-cal">← Voltar ao calendário</button>
+      <h3 class="day-title">${dateLabel}</h3>
+      <div class="empty-state">${psiBadge(56)}<div>Nenhuma profissional cadastrada.</div></div>`;
+  }
+
+  const cards = profs.map(p=>`
+    <button class="prof-select-card" data-select-prof="${p.id}">
+      <div class="li-main">
+        <div class="avatar">${initials(p.nome)}</div>
+        <div class="li-info">
+          <div class="li-title">${p.nome}</div>
+        </div>
+      </div>
+      <span style="color:var(--muted);font-size:20px;">›</span>
+    </button>`).join('');
+
+  return `
+    <button class="back-link" id="back-to-cal">← Voltar ao calendário</button>
+    <h3 class="day-title">${dateLabel}</h3>
+    <p class="day-sub">Escolha a profissional para ver os horários.</p>
+    ${cards}
+  `;
+}
+
+async function renderDayViewAsync(){
+  const d = view.selectedDate;
+  const prof = professionals.find(p=>p.id===view.selectedProfId);
+  const dateLabel = cap(d.toLocaleDateString('pt-BR',{weekday:'long', day:'2-digit', month:'long', year:'numeric'}));
+
+  if(!prof){
+    document.getElementById('content').innerHTML = `
+      <button class="back-link" id="back-to-cal">← Voltar ao calendário</button>
+      <h3 class="day-title">${dateLabel}</h3>
+      <div class="empty-state">${psiBadge(56)}<div>Profissional não encontrada.</div></div>`;
+    attachAgendaHandlers();
+    return;
+  }
+
+  const canEditPatient = currentUser.role!=='profissional' || currentUser.profissionalId===prof.id;
+  const canEditTime = canEditHorarios();
+  const dk = dateKey(d);
+  const slots = await loadAppts(prof.id, dk);
+
+  let slotsHtml = slots.map(s=>renderSlot(prof.id, s, canEditPatient, canEditTime)).join('');
+  if(slots.length===0){
+    slotsHtml = `<div style="padding:24px 16px;text-align:center;color:var(--muted);font-size:13px;">Nenhum horário criado para este dia ainda.</div>`;
+  }
+
+  const addRow = canEditTime ? `
+    <div class="add-slot-row" id="add-slot-row">
+      <button class="add-slot-link" id="show-add-slot">+ Adicionar horário</button>
+    </div>` : '';
+
+  const backLabel = view.multiProfDay ? 'Escolher outra profissional' : 'Voltar ao calendário';
+
+  document.getElementById('content').innerHTML = `
+    <button class="back-link" id="back-to-day-prev">← ${backLabel}</button>
+    <h3 class="day-title">${dateLabel}</h3>
+    <p class="day-sub">
+      <span style="display:inline-flex;align-items:center;gap:6px;">
+        <span class="avatar" style="width:22px;height:22px;font-size:10.5px;">${initials(prof.nome)}</span>
+        <strong style="color:var(--primary-dark);">${prof.nome}</strong>
+      </span>
+      ${canEditTime ? ' — crie, edite ou remova os horários do dia.' : ' — preencha o paciente e as observações de cada horário.'}
+    </p>
+    <div class="prof-block">
+      ${slotsHtml}
+      ${addRow}
+    </div>
+  `;
+  attachAgendaHandlers();
+}
+
+function renderSlot(profId, s, canEditPatient, canEditTime){
+  const timeHtml = canEditTime
+    ? `<input class="slot-time-input" value="${s.horarioInicio}" data-time-field="horarioInicio" data-appt-id="${s.id}">
+       <span style="color:var(--muted);">–</span>
+       <input class="slot-time-input" value="${s.horarioFim}" data-time-field="horarioFim" data-appt-id="${s.id}">`
+    : `<span class="slot-time-static mono">${s.horarioInicio} – ${s.horarioFim}</span>`;
+  const delBtn = canEditTime ? `<span class="slot-del-btn" data-del-appt="${s.id}" title="Excluir horário">×</span>` : '';
+  const patVal = (s.paciente||'').replace(/"/g,'&quot;');
+  const obsVal = (s.obs||'').replace(/"/g,'&quot;');
+  return `
+    <div class="slot">
+      <div class="slot-time-row">
+        ${timeHtml}
+        <span style="flex:1;"></span>
+        ${delBtn}
+      </div>
+      <input class="pat-input" placeholder="Paciente" value="${patVal}" data-appt-id="${s.id}" data-field="paciente" ${canEditPatient?'':'disabled'}>
+      <input class="obs-input" placeholder="Observações da sessão" value="${obsVal}" data-appt-id="${s.id}" data-field="obs" ${canEditPatient?'':'disabled'}>
+      <div class="save-flag" data-flag="${s.id}">Salvo ✓</div>
+    </div>`;
+}
+
+function renderDayView(){
+  return `<div class="loading-wrap" style="padding:60px 0;"><div class="spinner"></div><div>Carregando horários…</div></div>`;
+}
+
+function attachAgendaHandlers(){
+  const prevBtn = document.getElementById('prev-month');
+  const nextBtn = document.getElementById('next-month');
+  if(prevBtn) prevBtn.addEventListener('click', ()=>{ view.monthCursor = new Date(view.monthCursor.getFullYear(), view.monthCursor.getMonth()-1, 1); render(); });
+  if(nextBtn) nextBtn.addEventListener('click', ()=>{ view.monthCursor = new Date(view.monthCursor.getFullYear(), view.monthCursor.getMonth()+1, 1); render(); });
+
+  document.querySelectorAll('.cal-day[data-date]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const [y,m,dd] = btn.dataset.date.split('-').map(Number);
+      const selDate = new Date(y, m-1, dd);
+      const profs = visibleProfessionals();
+      view.selectedDate = selDate;
+      if(profs.length===1){
+        view.screen = 'day';
+        view.selectedProfId = profs[0].id;
+        view.multiProfDay = false;
+        render();
+        renderDayViewAsync();
+      }else{
+        view.screen = 'profSelect';
+        view.selectedProfId = null;
+        view.multiProfDay = profs.length>1;
+        render();
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-select-prof]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      view.selectedProfId = btn.dataset.selectProf;
+      view.screen = 'day';
+      render();
+      renderDayViewAsync();
+    });
+  });
+
+  const backBtn = document.getElementById('back-to-cal');
+  if(backBtn) backBtn.addEventListener('click', ()=>{ view.screen='calendar'; view.selectedDate=null; view.selectedProfId=null; render(); });
+
+  const backDayBtn = document.getElementById('back-to-day-prev');
+  if(backDayBtn) backDayBtn.addEventListener('click', ()=>{
+    if(view.multiProfDay){ view.screen='profSelect'; view.selectedProfId=null; }
+    else{ view.screen='calendar'; view.selectedDate=null; }
+    render();
+  });
+
+  // paciente / observações
+  document.querySelectorAll('.pat-input, .obs-input').forEach(inp=>{
+    inp.addEventListener('change', async (e)=>{
+      const apptId = e.target.dataset.apptId;
+      const field = e.target.dataset.field;
+      const flag = document.querySelector(`.save-flag[data-flag="${apptId}"]`);
+      try{
+        await api('/appointments/'+view.selectedProfId+'/'+apptId, { method:'PUT', body: JSON.stringify({ [field]: e.target.value }) });
+        if(flag){ flag.textContent='Salvo ✓'; flag.style.color='var(--success)'; flag.classList.add('show'); setTimeout(()=>flag.classList.remove('show'), 1400); }
+      }catch(err){
+        if(flag){ flag.textContent='Erro ao salvar: '+err.message; flag.style.color='var(--danger)'; flag.classList.add('show'); }
+      }
+    });
+  });
+
+  // horário início/fim (só recepção/admin)
+  document.querySelectorAll('.slot-time-input').forEach(inp=>{
+    inp.addEventListener('change', async (e)=>{
+      const apptId = e.target.dataset.apptId;
+      const field = e.target.dataset.timeField;
+      try{
+        await api('/appointments/'+view.selectedProfId+'/'+apptId, { method:'PUT', body: JSON.stringify({ [field]: e.target.value }) });
+        renderDayViewAsync();
+      }catch(err){ alert(err.message); }
+    });
+  });
+
+  // excluir horário
+  document.querySelectorAll('[data-del-appt]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if(!confirm('Excluir este horário?')) return;
+      try{
+        await api('/appointments/'+view.selectedProfId+'/'+btn.dataset.delAppt, { method:'DELETE' });
+        renderDayViewAsync();
+      }catch(err){ alert(err.message); }
+    });
+  });
+
+  // + adicionar horário
+  const showAddBtn = document.getElementById('show-add-slot');
+  if(showAddBtn) showAddBtn.addEventListener('click', ()=>openAddSlotForm());
+}
+
+function openAddSlotForm(){
+  const row = document.getElementById('add-slot-row');
+  if(!row) return;
+  row.innerHTML = `
+    <div style="text-align:left;">
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <input class="slot-time-input" id="new-slot-inicio" placeholder="08:00" style="width:80px;">
+        <span style="color:var(--muted);align-self:center;">–</span>
+        <input class="slot-time-input" id="new-slot-fim" placeholder="08:50" style="width:80px;">
+      </div>
+      <input class="pat-input" id="new-slot-paciente" placeholder="Paciente (opcional)" style="margin-bottom:8px;">
+      <div style="display:flex;gap:8px;">
+        <button class="btn-secondary" id="cancel-add-slot" style="flex:1;">Cancelar</button>
+        <button class="btn-primary" id="save-add-slot" style="flex:1;">Salvar horário</button>
+      </div>
+    </div>`;
+  document.getElementById('cancel-add-slot').addEventListener('click', ()=>renderDayViewAsync());
+  document.getElementById('save-add-slot').addEventListener('click', async ()=>{
+    const inicio = document.getElementById('new-slot-inicio').value.trim();
+    const fim = document.getElementById('new-slot-fim').value.trim();
+    const paciente = document.getElementById('new-slot-paciente').value.trim();
+    if(!inicio || !fim){ alert('Informe início e fim do horário.'); return; }
+    try{
+      await api('/appointments/'+view.selectedProfId, {
+        method:'POST',
+        body: JSON.stringify({ date: dateKey(view.selectedDate), horarioInicio: inicio, horarioFim: fim, paciente })
+      });
+      renderDayViewAsync();
+    }catch(err){ alert(err.message); }
+  });
+}
+
+/* ============== PROFISSIONAIS TAB ============== */
+function renderProfissionaisTab(){
+  const isAdmin = currentUser.role==='admin';
+  let cards = professionals.map(p=>`
+    <div class="list-card">
+      <div class="li-main">
+        <div class="avatar">${initials(p.nome)}</div>
+        <div class="li-info">
+          <div class="li-title">${p.nome}</div>
+        </div>
+      </div>
+      ${isAdmin ? `<button class="btn-secondary" data-edit-prof="${p.id}" style="padding:8px 12px;font-size:12.5px;">Editar</button>` : ''}
+    </div>`).join('');
+
+  if(professionals.length===0) cards = `<div class="empty-state">${psiBadge(56)}<div>Nenhuma profissional cadastrada.</div></div>`;
+
+  return `
+    <div class="section-title"><h3>Profissionais</h3>${isAdmin?'<button class="add-btn" id="add-prof-btn">+ Nova</button>':''}</div>
+    ${cards}
+  `;
+}
+function attachProfissionaisHandlers(){
+  const addBtn = document.getElementById('add-prof-btn');
+  if(addBtn) addBtn.addEventListener('click', ()=>openProfModal(null));
+  document.querySelectorAll('[data-edit-prof]').forEach(btn=>{
+    btn.addEventListener('click', ()=>openProfModal(btn.dataset.editProf));
+  });
+}
+function openProfModal(profId){
+  const editing = profId ? professionals.find(p=>p.id===profId) : null;
+  const modalHtml = `
+    <div class="modal-bg" id="modal-bg">
+      <div class="modal">
+        <h3>${editing?'Editar profissional':'Nova profissional'}</h3>
+        <div class="field"><label>Nome</label><input id="pf-nome" value="${editing?editing.nome:''}" placeholder="ex: Dra. Marina Costa"></div>
+        <div class="modal-actions">
+          ${editing?`<button class="btn-danger" id="pf-delete" style="padding:12px 16px;">Excluir</button>`:''}
+          <button class="btn-primary" id="pf-save">Salvar</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+  document.getElementById('modal-bg').addEventListener('click', (e)=>{ if(e.target.id==='modal-bg') closeModal(); });
+  document.getElementById('pf-save').addEventListener('click', async ()=>{
+    const nome = document.getElementById('pf-nome').value.trim();
+    if(!nome) return;
+    const saveBtn = document.getElementById('pf-save'); saveBtn.disabled = true; saveBtn.textContent = 'Salvando…';
+    try{
+      if(editing){
+        const updated = await api('/professionals/'+editing.id, {method:'PUT', body: JSON.stringify({nome})});
+        Object.assign(editing, updated);
+      }else{
+        const created = await api('/professionals', {method:'POST', body: JSON.stringify({nome})});
+        professionals.push(created);
+      }
+      closeModal(); render();
+    }catch(err){
+      alert(err.message);
+      saveBtn.disabled = false; saveBtn.textContent = 'Salvar';
+    }
+  });
+  const delBtn = document.getElementById('pf-delete');
+  if(delBtn) delBtn.addEventListener('click', async ()=>{
+    if(!confirm('Excluir esta profissional? A agenda dela deixará de aparecer.')) return;
+    try{
+      await api('/professionals/'+editing.id, {method:'DELETE'});
+      professionals = professionals.filter(p=>p.id!==editing.id);
+      closeModal(); render();
+    }catch(err){ alert(err.message); }
+  });
+}
+function closeModal(){ const m = document.getElementById('modal-bg'); if(m) m.remove(); }
+
+/* ============== USUARIOS TAB (admin only) ============== */
+function renderUsuariosTab(){
+  const cards = users.map(u=>{
+    const profName = u.profissionalId ? (professionals.find(p=>p.id===u.profissionalId)||{}).nome : null;
+    return `
+    <div class="list-card">
+      <div class="li-main">
+        <div class="avatar">${initials(u.nome)}</div>
+        <div class="li-info">
+          <div class="li-title">${u.nome} <span class="badge ${u.role}">${{admin:'Admin',profissional:'Profissional',recepcao:'Recepção'}[u.role]}</span></div>
+          <div class="li-sub">usuário: ${u.username}${profName?' · '+profName:''}</div>
+        </div>
+      </div>
+      ${u.username!=='admin' || currentUser.username!==u.username ? `<button class="btn-secondary" data-edit-user="${u.username}" style="padding:8px 12px;font-size:12.5px;">Editar</button>` : ''}
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="note-box">📊 O banco de dados deste app é o Supabase — profissionais, usuários e horários ficam gravados lá.</div>
+    <div class="section-title"><h3>Usuários</h3><button class="add-btn" id="add-user-btn">+ Novo</button></div>
+    ${cards}
+  `;
+}
+function attachUsuariosHandlers(){
+  document.getElementById('add-user-btn').addEventListener('click', ()=>openUserModal(null));
+  document.querySelectorAll('[data-edit-user]').forEach(btn=>{
+    btn.addEventListener('click', ()=>openUserModal(btn.dataset.editUser));
+  });
+}
+function openUserModal(username){
+  const editing = username ? users.find(u=>u.username===username) : null;
+  const modalHtml = `
+    <div class="modal-bg" id="modal-bg">
+      <div class="modal">
+        <h3>${editing?'Editar usuário':'Novo usuário'}</h3>
+        <div class="field"><label>Nome completo</label><input id="us-nome" value="${editing?editing.nome:''}" placeholder="ex: Rafael Torres"></div>
+        <div class="field"><label>Usuário (login)</label><input id="us-user" value="${editing?editing.username:''}" placeholder="ex: dr.rafael" ${editing?'disabled':''}></div>
+        <div class="field"><label>Senha</label><input id="us-pass" type="text" value="" placeholder="${editing?'deixe em branco para manter a atual':'defina uma senha'}"></div>
+        <div class="field">
+          <label>Perfil de acesso</label>
+          <select id="us-role">
+            <option value="profissional" ${editing&&editing.role==='profissional'?'selected':''}>Profissional</option>
+            <option value="recepcao" ${editing&&editing.role==='recepcao'?'selected':''}>Recepção</option>
+            <option value="admin" ${editing&&editing.role==='admin'?'selected':''}>Administrador</option>
+          </select>
+        </div>
+        <div class="field" id="us-prof-field" style="display:${editing&&editing.role==='profissional'?'block':'none'};">
+          <label>Vincular à profissional</label>
+          <select id="us-prof">
+            <option value="">—</option>
+            ${professionals.map(p=>`<option value="${p.id}" ${editing&&editing.profissionalId===p.id?'selected':''}>${p.nome}</option>`).join('')}
+          </select>
+        </div>
+        <div class="modal-actions">
+          ${editing && editing.username!=='admin' ? `<button class="btn-danger" id="us-delete" style="padding:12px 16px;">Excluir</button>`:''}
+          <button class="btn-primary" id="us-save">Salvar</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+  document.getElementById('modal-bg').addEventListener('click', (e)=>{ if(e.target.id==='modal-bg') closeModal(); });
+  const roleSel = document.getElementById('us-role');
+  roleSel.addEventListener('change', ()=>{
+    document.getElementById('us-prof-field').style.display = roleSel.value==='profissional' ? 'block' : 'none';
+  });
+  document.getElementById('us-save').addEventListener('click', async ()=>{
+    const nome = document.getElementById('us-nome').value.trim();
+    const usernameVal = document.getElementById('us-user').value.trim().toLowerCase();
+    const senha = document.getElementById('us-pass').value;
+    const role = document.getElementById('us-role').value;
+    const profissionalId = role==='profissional' ? (document.getElementById('us-prof').value || null) : null;
+    if(!nome || !usernameVal || (!editing && !senha)){ alert('Preencha nome, usuário e senha.'); return; }
+    const saveBtn = document.getElementById('us-save'); saveBtn.disabled = true; saveBtn.textContent = 'Salvando…';
+    try{
+      if(editing){
+        const body = {nome, role, profissionalId};
+        if(senha) body.senha = senha;
+        const updated = await api('/users/'+editing.username, {method:'PUT', body: JSON.stringify(body)});
+        Object.assign(editing, updated);
+      }else{
+        const created = await api('/users', {method:'POST', body: JSON.stringify({username:usernameVal, nome, senha, role, profissionalId})});
+        users.push(created);
+      }
+      closeModal(); render();
+    }catch(err){
+      alert(err.message);
+      saveBtn.disabled = false; saveBtn.textContent = 'Salvar';
+    }
+  });
+  const delBtn = document.getElementById('us-delete');
+  if(delBtn) delBtn.addEventListener('click', async ()=>{
+    if(!confirm('Excluir este usuário?')) return;
+    try{
+      await api('/users/'+editing.username, {method:'DELETE'});
+      users = users.filter(u=>u.username!==editing.username);
+      closeModal(); render();
+    }catch(err){ alert(err.message); }
+  });
+}
+
+/* ============== INIT ============== */
+(async function init(){
+  render();
+  try{
+    const savedToken = localStorage.getItem('psiagenda_token');
+    const savedUser = localStorage.getItem('psiagenda_user');
+    if(savedToken && savedUser){
+      authToken = savedToken;
+      currentUser = JSON.parse(savedUser);
+      await loadClinicData();
+    }
+  }catch(err){
+    console.error('Não foi possível restaurar a sessão salva:', err);
+    logoutLocal();
+  }
+  loading = false;
+  render();
+})();
+</script>
+</body>
+</html>
