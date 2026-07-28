@@ -682,6 +682,7 @@ function renderProfissionaisTab(){
         <div class="avatar">${initials(p.nome)}</div>
         <div class="li-info">
           <div class="li-title">${p.nome}</div>
+          ${isAdmin ? `<div class="li-sub">${p.googleConnected ? '🟢 Google Agenda conectada' : '⚪ Google Agenda não conectada'}</div>` : ''}
         </div>
       </div>
       ${isAdmin ? `<button class="btn-secondary" data-edit-prof="${p.id}" style="padding:8px 12px;font-size:12.5px;">Editar</button>` : ''}
@@ -703,11 +704,23 @@ function attachProfissionaisHandlers(){
 }
 function openProfModal(profId){
   const editing = profId ? professionals.find(p=>p.id===profId) : null;
+  const googleSection = editing ? `
+        <div class="field">
+          <label>Google Agenda</label>
+          <div id="pf-google-status" style="font-size:13px;color:#555;margin-bottom:8px;">
+            ${editing.googleConnected ? '🟢 Conectada — os agendamentos feitos aqui aparecem automaticamente na agenda dela.' : '⚪ Ainda não conectada.'}
+          </div>
+          ${editing.googleConnected
+            ? `<button type="button" class="btn-secondary" id="pf-google-disconnect" style="padding:8px 12px;font-size:12.5px;">Desconectar</button>`
+            : `<button type="button" class="btn-secondary" id="pf-google-connect" style="padding:8px 12px;font-size:12.5px;">Conectar Google Agenda</button>`}
+        </div>` : `<div class="note-box" style="font-size:12.5px;">Salve a profissional com um e-mail preenchido para poder conectar o Google Agenda dela depois.</div>`;
   const modalHtml = `
     <div class="modal-bg" id="modal-bg">
       <div class="modal">
         <h3>${editing?'Editar profissional':'Nova profissional'}</h3>
         <div class="field"><label>Nome</label><input id="pf-nome" value="${editing?editing.nome:''}" placeholder="ex: Dra. Marina Costa"></div>
+        <div class="field"><label>E-mail do Google (pessoal)</label><input id="pf-email" type="email" value="${editing&&editing.email?editing.email:''}" placeholder="ex: marina@gmail.com"></div>
+        ${googleSection}
         <div class="modal-actions">
           ${editing?`<button class="btn-danger" id="pf-delete" style="padding:12px 16px;">Excluir</button>`:''}
           <button class="btn-primary" id="pf-save">Salvar</button>
@@ -718,14 +731,15 @@ function openProfModal(profId){
   document.getElementById('modal-bg').addEventListener('click', (e)=>{ if(e.target.id==='modal-bg') closeModal(); });
   document.getElementById('pf-save').addEventListener('click', async ()=>{
     const nome = document.getElementById('pf-nome').value.trim();
+    const email = document.getElementById('pf-email').value.trim();
     if(!nome) return;
     const saveBtn = document.getElementById('pf-save'); saveBtn.disabled = true; saveBtn.textContent = 'Salvando…';
     try{
       if(editing){
-        const updated = await api('/professionals/'+editing.id, {method:'PUT', body: JSON.stringify({nome})});
+        const updated = await api('/professionals/'+editing.id, {method:'PUT', body: JSON.stringify({nome, email})});
         Object.assign(editing, updated);
       }else{
-        const created = await api('/professionals', {method:'POST', body: JSON.stringify({nome})});
+        const created = await api('/professionals', {method:'POST', body: JSON.stringify({nome, email})});
         professionals.push(created);
       }
       closeModal(); render();
@@ -741,6 +755,27 @@ function openProfModal(profId){
       await api('/professionals/'+editing.id, {method:'DELETE'});
       professionals = professionals.filter(p=>p.id!==editing.id);
       closeModal(); render();
+    }catch(err){ alert(err.message); }
+  });
+  const connectBtn = document.getElementById('pf-google-connect');
+  if(connectBtn) connectBtn.addEventListener('click', async ()=>{
+    connectBtn.disabled = true; connectBtn.textContent = 'Gerando link…';
+    try{
+      const { url } = await api('/google/connect/'+editing.id, {method:'GET'});
+      window.open(url, '_blank');
+      alert('Uma nova aba abriu para a profissional entrar com a conta Google dela e autorizar. Depois de autorizar, feche a aba e reabra esta tela de edição para ver o status atualizado.');
+    }catch(err){
+      alert(err.message);
+    }
+    connectBtn.disabled = false; connectBtn.textContent = 'Conectar Google Agenda';
+  });
+  const disconnectBtn = document.getElementById('pf-google-disconnect');
+  if(disconnectBtn) disconnectBtn.addEventListener('click', async ()=>{
+    if(!confirm('Desconectar o Google Agenda desta profissional? Os agendamentos deixarão de ser copiados pra lá.')) return;
+    try{
+      await api('/google/disconnect/'+editing.id, {method:'POST'});
+      editing.googleConnected = false;
+      closeModal(); openProfModal(editing.id);
     }catch(err){ alert(err.message); }
   });
 }
