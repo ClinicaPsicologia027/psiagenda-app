@@ -55,14 +55,35 @@ router.get('/:profId/:date', async (req, res) => {
   } catch (e) { res.status(502).json({ error: e.message }); }
 });
 
+// Soma dias a uma data "YYYY-MM-DD" sem depender do fuso horário local
+// (trabalha tudo em UTC pra não correr risco de virar o dia errado).
+function addDaysToDateStr(dateStr, days) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  const yy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getUTCDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
 // Cria um novo horário — só recepção e admin definem os horários do dia.
+// Se "repeatWeeks" vier > 1, cria o mesmo horário/paciente também nas semanas
+// seguintes (mesmo dia da semana), como agendamentos independentes — cada um
+// pode depois ser editado ou excluído sem afetar os outros.
 router.post('/:profId', requireRole('admin', 'recepcao'), async (req, res) => {
-  const { date, horarioInicio, horarioFim, paciente, obs } = req.body || {};
+  const { date, horarioInicio, horarioFim, paciente, obs, repeatWeeks } = req.body || {};
   if (!date || !horarioInicio || !horarioFim) return res.status(400).json({ error: 'Informe data, início e fim.' });
+  const totalWeeks = Math.min(Math.max(parseInt(repeatWeeks, 10) || 1, 1), 4);
   try {
-    const created = await dataStore.createAppointment(req.params.profId, date, horarioInicio, horarioFim, paciente || '', obs || '');
-    await syncCreate(req.params.profId, created);
-    res.status(201).json(created);
+    const createdList = [];
+    for (let i = 0; i < totalWeeks; i++) {
+      const d = i === 0 ? date : addDaysToDateStr(date, i * 7);
+      const created = await dataStore.createAppointment(req.params.profId, d, horarioInicio, horarioFim, paciente || '', obs || '');
+      await syncCreate(req.params.profId, created);
+      createdList.push(created);
+    }
+    res.status(201).json(totalWeeks > 1 ? createdList : createdList[0]);
   } catch (e) { res.status(502).json({ error: e.message }); }
 });
 
