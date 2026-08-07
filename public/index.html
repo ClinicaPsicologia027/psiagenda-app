@@ -641,6 +641,17 @@ function attachAgendaHandlers(){
   if(printBtn) printBtn.addEventListener('click', ()=>window.print());
 }
 
+// Retorna as N datas (objetos Date) da mesma repetição semanal a partir de baseDate,
+// incluindo a própria baseDate. weeks=4 => baseDate + 3 semanas seguintes.
+function weeklyRepeatDates(baseDate, weeks){
+  const out = [];
+  for(let i=0;i<weeks;i++){
+    out.push(new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() + i*7));
+  }
+  return out;
+}
+function ddmm(d){ return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'); }
+
 function openAddSlotForm(){
   const row = document.getElementById('add-slot-row');
   if(!row) return;
@@ -652,21 +663,42 @@ function openAddSlotForm(){
         <input class="slot-time-input" id="new-slot-fim" placeholder="08:50" style="width:80px;">
       </div>
       <input class="pat-input" id="new-slot-paciente" placeholder="Paciente (opcional)" style="margin-bottom:8px;">
+      <label style="display:flex;align-items:flex-start;gap:9px;background:rgba(185,169,217,0.18);border:1px solid rgba(185,169,217,0.4);border-radius:10px;padding:11px 12px;margin-bottom:10px;cursor:pointer;">
+        <input type="checkbox" id="new-slot-repeat" style="margin-top:2px;accent-color:var(--primary);width:15px;height:15px;flex-shrink:0;">
+        <span style="font-size:12.5px;color:#5b4d82;line-height:1.5;">
+          <strong style="color:var(--primary-dark);">Repetir semanalmente por 4 semanas</strong><br>
+          Cria o mesmo horário nas próximas 3 semanas, no mesmo dia da semana, com o mesmo paciente. Cada data fica independente — dá pra editar horário, paciente ou observação de cada uma depois.
+        </span>
+      </label>
+      <div id="repeat-dates-preview" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:12px;"></div>
       <div style="display:flex;gap:8px;">
         <button class="btn-secondary" id="cancel-add-slot" style="flex:1;">Cancelar</button>
         <button class="btn-primary" id="save-add-slot" style="flex:1;">Salvar horário</button>
       </div>
     </div>`;
   document.getElementById('cancel-add-slot').addEventListener('click', ()=>renderDayViewAsync());
+  const repeatChk = document.getElementById('new-slot-repeat');
+  const preview = document.getElementById('repeat-dates-preview');
+  repeatChk.addEventListener('change', ()=>{
+    if(repeatChk.checked){
+      const dates = weeklyRepeatDates(view.selectedDate, 4);
+      preview.innerHTML = dates.map(d=>`<span style="font-size:11px;font-weight:600;padding:4px 9px;border-radius:20px;background:rgba(74,71,133,0.12);color:var(--primary);">${ddmm(d)}</span>`).join('');
+      preview.style.display = 'flex';
+    }else{
+      preview.style.display = 'none';
+      preview.innerHTML = '';
+    }
+  });
   document.getElementById('save-add-slot').addEventListener('click', async ()=>{
     const inicio = document.getElementById('new-slot-inicio').value.trim();
     const fim = document.getElementById('new-slot-fim').value.trim();
     const paciente = document.getElementById('new-slot-paciente').value.trim();
+    const repeatWeeks = repeatChk.checked ? 4 : 1;
     if(!inicio || !fim){ alert('Informe início e fim do horário.'); return; }
     try{
       await api('/appointments/'+view.selectedProfId, {
         method:'POST',
-        body: JSON.stringify({ date: dateKey(view.selectedDate), horarioInicio: inicio, horarioFim: fim, paciente })
+        body: JSON.stringify({ date: dateKey(view.selectedDate), horarioInicio: inicio, horarioFim: fim, paciente, repeatWeeks })
       });
       renderDayViewAsync();
     }catch(err){ alert(err.message); }
