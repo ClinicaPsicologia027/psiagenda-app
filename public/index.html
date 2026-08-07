@@ -657,7 +657,7 @@ function openAddSlotForm(){
   if(!row) return;
   row.innerHTML = `
     <div style="text-align:left;">
-      <div style="display:flex;gap:8px;margin-bottom:8px;">
+      <div id="shared-time-row" style="display:flex;gap:8px;margin-bottom:8px;">
         <input class="slot-time-input" id="new-slot-inicio" placeholder="08:00" style="width:80px;">
         <span style="color:var(--muted);align-self:center;">–</span>
         <input class="slot-time-input" id="new-slot-fim" placeholder="08:50" style="width:80px;">
@@ -667,34 +667,118 @@ function openAddSlotForm(){
         <input type="checkbox" id="new-slot-repeat" style="margin-top:2px;accent-color:var(--primary);width:15px;height:15px;flex-shrink:0;">
         <span style="font-size:12.5px;color:#5b4d82;line-height:1.5;">
           <strong style="color:var(--primary-dark);">Repetir semanalmente por 4 semanas</strong><br>
-          Cria o mesmo horário nas próximas 3 semanas, no mesmo dia da semana, com o mesmo paciente. Cada data fica independente — dá pra editar horário, paciente ou observação de cada uma depois.
+          Cria a sessão nas próximas 3 semanas também, no mesmo dia da semana, com o mesmo paciente. Cada data fica independente — dá pra editar depois.
         </span>
       </label>
-      <div id="repeat-dates-preview" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:12px;"></div>
+
+      <div id="repeat-options" style="display:none;margin-bottom:12px;">
+        <div style="font-size:12.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">As 4 sessões vão ter o mesmo horário?</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <button type="button" class="btn-secondary" id="repeat-same-btn" style="flex:1;">Sim, mesmo horário</button>
+          <button type="button" class="btn-secondary" id="repeat-diff-btn" style="flex:1;">Não, horários diferentes</button>
+        </div>
+        <div id="repeat-dates-preview" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:6px;"></div>
+        <div id="repeat-custom-rows" style="display:none;"></div>
+      </div>
+
       <div style="display:flex;gap:8px;">
         <button class="btn-secondary" id="cancel-add-slot" style="flex:1;">Cancelar</button>
         <button class="btn-primary" id="save-add-slot" style="flex:1;">Salvar horário</button>
       </div>
     </div>`;
   document.getElementById('cancel-add-slot').addEventListener('click', ()=>renderDayViewAsync());
+
   const repeatChk = document.getElementById('new-slot-repeat');
+  const repeatOptions = document.getElementById('repeat-options');
+  const sameBtn = document.getElementById('repeat-same-btn');
+  const diffBtn = document.getElementById('repeat-diff-btn');
   const preview = document.getElementById('repeat-dates-preview');
+  const customRows = document.getElementById('repeat-custom-rows');
+  const sharedTimeRow = document.getElementById('shared-time-row');
+  let repeatMode = null; // 'same' | 'diff'
+
+  function setActiveModeBtn(mode){
+    [[sameBtn,'same'],[diffBtn,'diff']].forEach(([btn,val])=>{
+      const active = mode===val;
+      btn.style.background = active ? 'var(--primary)' : 'var(--surface)';
+      btn.style.color = active ? '#fff' : 'var(--text)';
+      btn.style.borderColor = active ? 'var(--primary)' : 'var(--line)';
+    });
+  }
+
+  function renderCustomRows(){
+    const dates = weeklyRepeatDates(view.selectedDate, 4);
+    customRows.innerHTML = dates.map((d,i)=>`
+      <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center;">
+        <input type="date" class="slot-time-input" style="width:132px;" id="repeat-date-${i}" value="${dateKey(d)}">
+        <input class="slot-time-input" style="width:60px;" id="repeat-inicio-${i}" placeholder="08:00">
+        <span style="color:var(--muted);">–</span>
+        <input class="slot-time-input" style="width:60px;" id="repeat-fim-${i}" placeholder="08:50">
+      </div>`).join('');
+  }
+
   repeatChk.addEventListener('change', ()=>{
     if(repeatChk.checked){
-      const dates = weeklyRepeatDates(view.selectedDate, 4);
-      preview.innerHTML = dates.map(d=>`<span style="font-size:11px;font-weight:600;padding:4px 9px;border-radius:20px;background:rgba(74,71,133,0.12);color:var(--primary);">${ddmm(d)}</span>`).join('');
-      preview.style.display = 'flex';
+      repeatOptions.style.display = 'block';
     }else{
-      preview.style.display = 'none';
-      preview.innerHTML = '';
+      repeatOptions.style.display = 'none';
+      repeatMode = null;
+      preview.style.display = 'none'; preview.innerHTML = '';
+      customRows.style.display = 'none'; customRows.innerHTML = '';
+      sharedTimeRow.style.display = 'flex';
+      setActiveModeBtn(null);
     }
   });
+
+  sameBtn.addEventListener('click', ()=>{
+    repeatMode = 'same';
+    setActiveModeBtn('same');
+    sharedTimeRow.style.display = 'flex';
+    customRows.style.display = 'none'; customRows.innerHTML = '';
+    const dates = weeklyRepeatDates(view.selectedDate, 4);
+    preview.innerHTML = dates.map(d=>`<span style="font-size:11px;font-weight:600;padding:4px 9px;border-radius:20px;background:rgba(74,71,133,0.12);color:var(--primary);">${ddmm(d)}</span>`).join('');
+    preview.style.display = 'flex';
+  });
+
+  diffBtn.addEventListener('click', ()=>{
+    repeatMode = 'diff';
+    setActiveModeBtn('diff');
+    sharedTimeRow.style.display = 'none';
+    preview.style.display = 'none'; preview.innerHTML = '';
+    customRows.style.display = 'block';
+    renderCustomRows();
+  });
+
   document.getElementById('save-add-slot').addEventListener('click', async ()=>{
+    const paciente = document.getElementById('new-slot-paciente').value.trim();
+
+    if(repeatChk.checked && !repeatMode){ alert('Escolha se o horário será o mesmo ou diferente nas 4 semanas.'); return; }
+
+    if(repeatChk.checked && repeatMode==='diff'){
+      const rows = [];
+      for(let i=0;i<4;i++){
+        const date = document.getElementById('repeat-date-'+i).value;
+        const inicio = document.getElementById('repeat-inicio-'+i).value.trim();
+        const fim = document.getElementById('repeat-fim-'+i).value.trim();
+        if(!date || !inicio || !fim){ alert('Preencha data, início e fim das 4 sessões.'); return; }
+        rows.push({ date, inicio, fim });
+      }
+      try{
+        for(const r of rows){
+          await api('/appointments/'+view.selectedProfId, {
+            method:'POST',
+            body: JSON.stringify({ date: r.date, horarioInicio: r.inicio, horarioFim: r.fim, paciente })
+          });
+        }
+        renderDayViewAsync();
+      }catch(err){ alert(err.message); }
+      return;
+    }
+
     const inicio = document.getElementById('new-slot-inicio').value.trim();
     const fim = document.getElementById('new-slot-fim').value.trim();
-    const paciente = document.getElementById('new-slot-paciente').value.trim();
-    const repeatWeeks = repeatChk.checked ? 4 : 1;
     if(!inicio || !fim){ alert('Informe início e fim do horário.'); return; }
+    const repeatWeeks = (repeatChk.checked && repeatMode==='same') ? 4 : 1;
     try{
       await api('/appointments/'+view.selectedProfId, {
         method:'POST',
