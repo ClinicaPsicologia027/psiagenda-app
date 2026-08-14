@@ -9,13 +9,43 @@ function must(error) {
 
 /* ---------------- PROFISSIONAIS ---------------- */
 // "googleConnected" é derivado (não expomos o refresh_token pro front-end).
+//
+// dias      -> dias fixos da semana em que ela atende, ex: "Seg,Qua,Sex".
+//              Vazio = atende todos os dias úteis (comportamento antigo, nada quebra).
+// excecoes  -> ajustes em datas específicas, ex: "2026-08-20:extra;2026-08-25:falta"
+//              extra = encaixe num dia fora da rotina; falta = não atende naquela data.
+function parseExcecoes(txt) {
+  return String(txt || '').split(';').map(s => s.trim()).filter(Boolean).map(par => {
+    const [data, tipo] = par.split(':');
+    return { data: (data || '').trim(), tipo: (tipo || '').trim() === 'extra' ? 'extra' : 'falta' };
+  }).filter(e => /^\d{4}-\d{2}-\d{2}$/.test(e.data));
+}
+function excecoesToText(lista) {
+  return (lista || [])
+    .filter(e => e && /^\d{4}-\d{2}-\d{2}$/.test(e.data))
+    .map(e => e.data + ':' + (e.tipo === 'extra' ? 'extra' : 'falta'))
+    .join(';');
+}
 function rowToProf(row) {
-  return { id: row.id, nome: row.nome, email: row.email || '', googleConnected: !!row.google_refresh_token };
+  return {
+    id: row.id,
+    nome: row.nome,
+    email: row.email || '',
+    googleConnected: !!row.google_refresh_token,
+    dias: String(row.dias || '').split(',').map(s => s.trim()).filter(Boolean),
+    excecoes: parseExcecoes(row.excecoes),
+  };
 }
 // Nunca inclui o google_refresh_token aqui — ele só é alterado pelas funções
 // específicas abaixo (setProfessionalGoogleToken), nunca por uma edição normal de nome/e-mail.
 function profToRow(p) {
-  return { id: p.id, nome: p.nome, email: p.email || null };
+  return {
+    id: p.id,
+    nome: p.nome,
+    email: p.email || null,
+    dias: (p.dias || []).join(','),
+    excecoes: excecoesToText(p.excecoes),
+  };
 }
 async function getProfessionals() {
   const { data, error } = await supabase.from('profissionais').select('*').order('nome', { ascending: true });
