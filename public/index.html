@@ -81,6 +81,11 @@
   .cal-dow{text-align:center;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;padding-bottom:4px;}
   .cal-day{aspect-ratio:1;border-radius:10px;background:var(--surface);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:var(--text);position:relative;}
   .cal-day.empty{visibility:hidden;}
+  .checkrow{display:flex;flex-wrap:wrap;gap:8px;}
+  .chip{padding:8px 13px;border-radius:20px;border:1.5px solid var(--line);font-size:13px;font-weight:600;color:var(--muted);background:var(--surface);}
+  .chip.on{background:var(--primary);color:#fff;border-color:var(--primary);}
+  .cal-day.has-work{border-color:rgba(140,120,180,0.5);}
+  .cal-day.has-work::after{content:'';position:absolute;bottom:5px;width:5px;height:5px;border-radius:50%;background:var(--accent);}
   .cal-day.today{outline:2px solid var(--accent);}
   .cal-day.selected{background:var(--primary);color:#fff;border-color:var(--primary);}
 
@@ -404,6 +409,27 @@ function canEditHorarios(){
   return currentUser.role==='admin' || currentUser.role==='recepcao';
 }
 
+/* ---- ESCALA: quem atende em cada dia ----
+   dias    = dias fixos da semana (vazio = atende todos os dias úteis)
+   excecoes = ajustes numa data específica: 'extra' (encaixe) ou 'falta' (não atende) */
+function atendeNoDia(prof, d){
+  const dk = dateKey(d);
+  const exc = (prof.excecoes || []).find(e => e.data === dk);
+  if(exc) return exc.tipo === 'extra';
+  const dias = prof.dias || [];
+  if(dias.length === 0) return true; // sem escala definida = atende sempre (como era antes)
+  return dias.includes(dowAbbr(d));
+}
+function profissionaisDoDia(d){
+  return visibleProfessionals().filter(p => atendeNoDia(p, d));
+}
+function resumoEscala(prof){
+  const dias = prof.dias || [];
+  const base = dias.length ? dias.join(', ') : 'todos os dias úteis';
+  const exc = (prof.excecoes || []).length;
+  return base + (exc ? ` · ${exc} ajuste${exc===1?'':'s'} de data` : '');
+}
+
 function renderAgendaTab(){
   if(view.screen==='day' && view.selectedDate){
     return renderDayView();
@@ -438,7 +464,8 @@ function renderCalendarView(){
       continue;
     }
     const isToday = dateKey(d)===dateKey(new Date());
-    cells += `<button class="cal-day ${isToday?'today':''}" data-date="${dateKey(d)}">${d.getDate()}</button>`;
+    const temProf = profissionaisDoDia(d).length>0;
+    cells += `<button class="cal-day ${temProf?'has-work':''} ${isToday?'today':''}" data-date="${dateKey(d)}">${d.getDate()}</button>`;
   }
 
   const emptyMsg = visibleProfessionals().length===0
@@ -482,7 +509,7 @@ async function renderHojePainelAsync(){
   const dk = dateKey(dia);
   const ehHoje = dk === dateKey(hojeReal);
   const dataLabel = cap(dia.toLocaleDateString('pt-BR',{weekday:'long', day:'2-digit', month:'long'}));
-  const profs = visibleProfessionals();
+  const profs = profissionaisDoDia(dia);
 
   const cabecalho = `
     <div class="hoje-head">
@@ -513,7 +540,7 @@ async function renderHojePainelAsync(){
   }
 
   if(profs.length===0){
-    alvo.innerHTML = `<div class="hoje-box">${cabecalho}<div class="hoje-vazio">Nenhuma profissional cadastrada.</div></div>`;
+    alvo.innerHTML = `<div class="hoje-box">${cabecalho}<div class="hoje-vazio">Nenhuma profissional atende neste dia.</div></div>`;
     ligarNavegacao();
     return;
   }
@@ -568,13 +595,13 @@ async function renderHojePainelAsync(){
 function renderProfSelectView(){
   const d = view.selectedDate;
   const dateLabel = cap(d.toLocaleDateString('pt-BR',{weekday:'long', day:'2-digit', month:'long', year:'numeric'}));
-  const profs = visibleProfessionals();
+  const profs = profissionaisDoDia(d);
 
   if(profs.length===0){
     return `
       <button class="back-link" id="back-to-cal">← Voltar ao calendário</button>
       <h3 class="day-title">${dateLabel}</h3>
-      <div class="empty-state">${psiBadge(56)}<div>Nenhuma profissional cadastrada.</div></div>`;
+      <div class="empty-state">${psiBadge(56)}<div>Nenhuma profissional atende neste dia.<br>Ajuste a escala na aba <strong>Profissionais</strong>.</div></div>`;
   }
 
   const cards = profs.map(p=>`
@@ -721,7 +748,7 @@ function attachAgendaHandlers(){
     btn.addEventListener('click', ()=>{
       const [y,m,dd] = btn.dataset.date.split('-').map(Number);
       const selDate = new Date(y, m-1, dd);
-      const profs = visibleProfessionals();
+      const profs = profissionaisDoDia(selDate);
       view.selectedDate = selDate;
       if(profs.length===1){
         view.screen = 'day';
@@ -823,8 +850,8 @@ async function printAllSchedules(){
   const dia = painelDate ? new Date(painelDate) : new Date(hojeReal.getFullYear(), hojeReal.getMonth(), hojeReal.getDate());
   const dk = dateKey(dia);
   const dateLabel = cap(dia.toLocaleDateString('pt-BR',{weekday:'long', day:'2-digit', month:'long', year:'numeric'}));
-  const profs = visibleProfessionals();
-  if(profs.length===0) throw new Error('Nenhuma profissional cadastrada.');
+  const profs = profissionaisDoDia(dia);
+  if(profs.length===0) throw new Error('Nenhuma profissional atende neste dia.');
 
   const secoes = [];
   for(const prof of profs){
@@ -1010,16 +1037,18 @@ function openAddSlotForm(){
 /* ============== PROFISSIONAIS TAB ============== */
 function renderProfissionaisTab(){
   const isAdmin = currentUser.role==='admin';
+  const podeEscala = isAdmin || currentUser.role==='recepcao'; // recepção ajusta a escala do dia a dia
   let cards = professionals.map(p=>`
     <div class="list-card">
       <div class="li-main">
         <div class="avatar">${initials(p.nome)}</div>
         <div class="li-info">
           <div class="li-title">${p.nome}</div>
+          <div class="li-sub">📅 ${resumoEscala(p)}</div>
           ${isAdmin ? `<div class="li-sub">${p.googleConnected ? '🟢 Google Agenda conectada' : '⚪ Google Agenda não conectada'}</div>` : ''}
         </div>
       </div>
-      ${isAdmin ? `<button class="btn-secondary" data-edit-prof="${p.id}" style="padding:8px 12px;font-size:12.5px;">Editar</button>` : ''}
+      ${podeEscala ? `<button class="btn-secondary" data-edit-prof="${p.id}" style="padding:8px 12px;font-size:12.5px;">${isAdmin?'Editar':'Escala'}</button>` : ''}
     </div>`).join('');
 
   if(professionals.length===0) cards = `<div class="empty-state">${psiBadge(56)}<div>Nenhuma profissional cadastrada.</div></div>`;
@@ -1038,6 +1067,10 @@ function attachProfissionaisHandlers(){
 }
 function openProfModal(profId){
   const editing = profId ? professionals.find(p=>p.id===profId) : null;
+  const diasSel = (editing && editing.dias) ? editing.dias.slice() : [];
+  let excState = (editing && editing.excecoes) ? editing.excecoes.map(e=>({...e})) : [];
+  // recepção só mexe na escala (dias e ajustes de data); nome, e-mail, Google e exclusão são do admin
+  const ehAdmin = currentUser.role==='admin';
   const googleSection = editing ? `
         <div class="field">
           <label>Google Agenda</label>
@@ -1051,29 +1084,84 @@ function openProfModal(profId){
   const modalHtml = `
     <div class="modal-bg" id="modal-bg">
       <div class="modal">
-        <h3>${editing?'Editar profissional':'Nova profissional'}</h3>
-        <div class="field"><label>Nome</label><input id="pf-nome" value="${editing?editing.nome:''}" placeholder="ex: Dra. Marina Costa"></div>
-        <div class="field"><label>E-mail do Google (pessoal)</label><input id="pf-email" type="email" value="${editing&&editing.email?editing.email:''}" placeholder="ex: marina@gmail.com"></div>
-        ${googleSection}
+        <h3>${editing?(ehAdmin?'Editar profissional':'Escala — '+editing.nome):'Nova profissional'}</h3>
+        <div class="field"><label>Nome</label><input id="pf-nome" value="${editing?editing.nome:''}" placeholder="ex: Dra. Marina Costa" ${ehAdmin?'':'disabled'}></div>
+        ${ehAdmin?`<div class="field"><label>E-mail do Google (pessoal)</label><input id="pf-email" type="email" value="${editing&&editing.email?editing.email:''}" placeholder="ex: marina@gmail.com"></div>`:''}
+        <div class="field">
+          <label>Dias fixos de atendimento</label>
+          <div class="checkrow" id="pf-dias">
+            ${['Seg','Ter','Qua','Qui','Sex'].map(d=>`<button type="button" class="chip ${diasSel.includes(d)?'on':''}" data-day="${d}">${d}</button>`).join('')}
+          </div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:6px;">Se não marcar nenhum, ela aparece em todos os dias úteis.</div>
+        </div>
+        <div class="field">
+          <label>Ajustes em datas específicas</label>
+          <div id="pf-exc-list"></div>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+            <button type="button" class="btn-secondary" id="pf-add-extra" style="padding:8px 12px;font-size:12.5px;">+ Encaixe (dia extra)</button>
+            <button type="button" class="btn-secondary" id="pf-add-falta" style="padding:8px 12px;font-size:12.5px;">+ Ausência (não atende)</button>
+          </div>
+        </div>
+        ${ehAdmin?googleSection:''}
         <div class="modal-actions">
-          ${editing?`<button class="btn-danger" id="pf-delete" style="padding:12px 16px;">Excluir</button>`:''}
+          ${(editing && ehAdmin)?`<button class="btn-danger" id="pf-delete" style="padding:12px 16px;">Excluir</button>`:''}
           <button class="btn-primary" id="pf-save">Salvar</button>
         </div>
       </div>
     </div>`;
   document.body.insertAdjacentHTML('beforeend', modalHtml);
   document.getElementById('modal-bg').addEventListener('click', (e)=>{ if(e.target.id==='modal-bg') closeModal(); });
+
+  // dias fixos: liga/desliga cada chip
+  document.querySelectorAll('#pf-dias .chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      const dia = chip.dataset.day;
+      const i = diasSel.indexOf(dia);
+      if(i>=0) diasSel.splice(i,1); else diasSel.push(dia);
+      chip.classList.toggle('on', i<0);
+    });
+  });
+
+  // ajustes por data (encaixe / ausência)
+  function pintaExcecoes(){
+    const box = document.getElementById('pf-exc-list');
+    if(!box) return;
+    if(excState.length===0){
+      box.innerHTML = `<div style="font-size:12px;color:var(--muted);">Nenhum ajuste — ela segue os dias fixos acima.</div>`;
+      return;
+    }
+    box.innerHTML = excState.map((e,i)=>`
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+        <span class="badge" style="background:${e.tipo==='extra'?'rgba(76,140,107,0.15)':'rgba(192,71,59,0.12)'};color:${e.tipo==='extra'?'#2f5b44':'var(--danger)'};">${e.tipo==='extra'?'encaixe':'ausência'}</span>
+        <input type="date" data-exc-idx="${i}" value="${e.data}" style="flex:1;border:1.5px solid var(--line);border-radius:8px;padding:7px 9px;font-family:inherit;font-size:13px;">
+        <button type="button" class="btn-danger" data-exc-del="${i}">Remover</button>
+      </div>`).join('');
+    box.querySelectorAll('[data-exc-idx]').forEach(inp=>{
+      inp.addEventListener('change', ()=>{ excState[Number(inp.dataset.excIdx)].data = inp.value; });
+    });
+    box.querySelectorAll('[data-exc-del]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ excState.splice(Number(btn.dataset.excDel),1); pintaExcecoes(); });
+    });
+  }
+  pintaExcecoes();
+  document.getElementById('pf-add-extra').addEventListener('click', ()=>{ excState.push({data:'', tipo:'extra'}); pintaExcecoes(); });
+  document.getElementById('pf-add-falta').addEventListener('click', ()=>{ excState.push({data:'', tipo:'falta'}); pintaExcecoes(); });
+
   document.getElementById('pf-save').addEventListener('click', async ()=>{
     const nome = document.getElementById('pf-nome').value.trim();
-    const email = document.getElementById('pf-email').value.trim();
+    const emailEl = document.getElementById('pf-email');
+    const email = emailEl ? emailEl.value.trim() : '';
     if(!nome) return;
+    const excecoes = excState.filter(e=>e.data);
+    if(excState.some(e=>!e.data)){ alert('Preencha a data de todos os ajustes (ou remova os que estiverem em branco).'); return; }
+    const dias = diasSel.slice();
     const saveBtn = document.getElementById('pf-save'); saveBtn.disabled = true; saveBtn.textContent = 'Salvando…';
     try{
       if(editing){
-        const updated = await api('/professionals/'+editing.id, {method:'PUT', body: JSON.stringify({nome, email})});
+        const updated = await api('/professionals/'+editing.id, {method:'PUT', body: JSON.stringify({nome, email, dias, excecoes})});
         Object.assign(editing, updated);
       }else{
-        const created = await api('/professionals', {method:'POST', body: JSON.stringify({nome, email})});
+        const created = await api('/professionals', {method:'POST', body: JSON.stringify({nome, email, dias, excecoes})});
         professionals.push(created);
       }
       closeModal(); render();
