@@ -147,10 +147,47 @@
   #print-area table{width:100%;border-collapse:collapse;margin-top:14px;}
   #print-area th,#print-area td{text-align:left;padding:8px 10px;border-bottom:1px solid #ccc;font-size:13px;}
   #print-area th{border-bottom:2px solid #333;}
+  #print-area .p-section + .p-section{page-break-before:always;break-before:page;margin-top:28px;}
   @media print{
     body *{visibility:hidden;}
     #print-area{display:block !important;visibility:visible;position:absolute;left:0;top:0;width:100%;padding:10px 0;}
     #print-area *{visibility:visible;}
+  }
+
+  /* ---- PAINEL DE VAGAS DO DIA (topo do calendário) ---- */
+  .hoje-box{background:var(--surface);border-radius:16px;box-shadow:var(--shadow);padding:14px 16px 16px;margin-bottom:18px;}
+  .hoje-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
+  .hoje-hoje{font-size:12px;font-weight:700;color:#fff;background:var(--primary);padding:3px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.05em;}
+  .hoje-data{font-size:13.5px;color:var(--muted);font-weight:600;}
+  .hoje-nav{display:flex;align-items:center;gap:6px;margin-left:auto;}
+  .hoje-nav-btn{width:28px;height:28px;border-radius:8px;border:1.5px solid var(--line);background:var(--surface);color:var(--primary-dark);font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0;}
+  .hoje-nav-btn:hover{border-color:var(--primary);}
+  .hoje-nav input[type=date]{border:1.5px solid var(--line);border-radius:8px;padding:5px 8px;font-size:12.5px;font-family:inherit;color:var(--text);background:var(--surface);}
+  .hoje-load,.hoje-vazio{color:var(--muted);font-size:13px;padding:4px 0;}
+  .hoje-prof + .hoje-prof{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;}
+  .hoje-prof-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+  .hoje-slots{display:flex;flex-wrap:wrap;gap:7px;}
+  .hoje-slot{display:flex;flex-direction:column;align-items:flex-start;gap:1px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface-2);padding:6px 10px;min-width:96px;text-align:left;}
+  .hoje-slot .hs-h{font-size:12.5px;font-weight:700;color:var(--primary-dark);}
+  .hoje-slot .hs-v{font-size:10.5px;color:var(--muted);font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .hoje-slot.livre{background:rgba(76,140,107,0.1);border-color:rgba(76,140,107,0.4);}
+  .hoje-slot.livre .hs-v{color:var(--success);}
+  .hoje-slot.cheio{background:rgba(185,169,217,0.22);border-color:rgba(140,120,180,0.45);}
+  .hoje-slot:hover{border-color:var(--primary);}
+
+  /* ---- TELAS MAIORES (tablet/computador) ---- */
+  @media (min-width: 700px){
+    #root{max-width:none;width:100%;}
+    .content{padding:26px 32px 52px;}
+    .cal-grid{gap:10px;max-width:620px;margin-left:auto;margin-right:auto;}
+    .cal-header{max-width:620px;margin-left:auto;margin-right:auto;}
+    .list-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;align-items:start;}
+    .list-grid > .list-card,.list-grid > .prof-select-card{margin-bottom:0;}
+    .modal-bg{align-items:center;}
+    .modal{border-radius:20px;max-height:80vh;max-width:560px;}
+  }
+  @media (min-width: 1100px){
+    .content{padding:30px 48px 60px;}
   }
 </style>
 </head>
@@ -171,7 +208,11 @@ let users = [];
 let currentUser = null;
 let authToken = null;
 let apptsCache = {}; // "profId|date" -> array de horários [{id, horarioInicio, horarioFim, paciente, obs}]
-let view = { tab: 'agenda', screen: 'calendar', monthCursor: new Date(2026,6,1), selectedDate: null, selectedProfId: null, multiProfDay: false, editingProf: null, editingUser: null };
+// O calendário abre sempre no mês de HOJE (data real do aparelho), nunca numa data fixa.
+function currentMonthStart(){ const h = new Date(); return new Date(h.getFullYear(), h.getMonth(), 1); }
+let view = { tab: 'agenda', screen: 'calendar', monthCursor: currentMonthStart(), selectedDate: null, selectedProfId: null, multiProfDay: false, editingProf: null, editingUser: null };
+let dayPollTimer = null; // atualização automática da agenda do dia
+let painelDate = null;   // dia que o painel de vagas está mostrando (null = hoje)
 let loading = true;
 let loginError = '';
 
@@ -285,7 +326,7 @@ function attachLoginHandlers(){
         localStorage.setItem('psiagenda_user', JSON.stringify(currentUser));
       }catch(e){ /* localStorage indisponível: sessão só dura enquanto a aba estiver aberta */ }
       loginError = '';
-      view = { tab: 'agenda', screen:'calendar', monthCursor:new Date(2026,6,1), selectedDate:null, selectedProfId:null, multiProfDay:false, editingProf:null, editingUser:null };
+      view = { tab: 'agenda', screen:'calendar', monthCursor:currentMonthStart(), selectedDate:null, selectedProfId:null, multiProfDay:false, editingProf:null, editingUser:null };
       loading = true; render();
       await loadClinicData();
       loading = false; render();
@@ -330,7 +371,7 @@ function tabBtn(key,label){
   return `<button class="tab-btn ${view.tab===key?'active':''}" data-tab="${key}">${label}</button>`;
 }
 function attachShellHandlers(){
-  document.getElementById('logout-btn').addEventListener('click', ()=>{ logoutLocal(); apptsCache={}; render(); });
+  document.getElementById('logout-btn').addEventListener('click', ()=>{ if(dayPollTimer){ clearInterval(dayPollTimer); dayPollTimer=null; } logoutLocal(); apptsCache={}; render(); });
   document.querySelectorAll('.tab-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       view.tab = btn.dataset.tab; view.screen='calendar'; view.selectedDate=null; view.selectedProfId=null; view.multiProfDay=false;
@@ -407,10 +448,14 @@ function renderCalendarView(){
     : '';
 
   return `
+    <div id="hoje-painel"><div class="hoje-box"><div class="hoje-load">Carregando os horários do dia…</div></div></div>
     <div class="cal-header">
       <button class="cal-nav-btn" id="prev-month">‹</button>
       <h2 class="display">${label}</h2>
       <button class="cal-nav-btn" id="next-month">›</button>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:6px;">
+      <button class="print-btn" id="open-print-all-btn" style="margin-bottom:0;">🖨️ Imprimir agendas do dia</button>
     </div>
     <div class="cal-grid">
       ${WEEK_DAYS.map(d=>`<div class="cal-dow">${d}</div>`).join('')}
@@ -418,6 +463,106 @@ function renderCalendarView(){
     </div>
     ${emptyMsg}
   `;
+}
+
+/* ---- PAINEL DE VAGAS DO DIA ----
+   Mostra, para um dia escolhido, cada profissional com os horários já criados,
+   quais estão livres e quais já têm paciente. Dá para navegar entre os dias. */
+function ehFimDeSemana(d){ const w = d.getDay(); return w===0 || w===6; }
+function pulaFimDeSemana(d, passo){
+  const r = new Date(d);
+  do{ r.setDate(r.getDate()+passo); } while(ehFimDeSemana(r));
+  return r;
+}
+async function renderHojePainelAsync(){
+  const alvo = document.getElementById('hoje-painel');
+  if(!alvo) return;
+  const hojeReal = new Date();
+  const dia = painelDate ? new Date(painelDate) : new Date(hojeReal.getFullYear(), hojeReal.getMonth(), hojeReal.getDate());
+  const dk = dateKey(dia);
+  const ehHoje = dk === dateKey(hojeReal);
+  const dataLabel = cap(dia.toLocaleDateString('pt-BR',{weekday:'long', day:'2-digit', month:'long'}));
+  const profs = visibleProfessionals();
+
+  const cabecalho = `
+    <div class="hoje-head">
+      <span class="hoje-hoje">${ehHoje?'Hoje':'Agenda'}</span>
+      <span class="hoje-data">${dataLabel}</span>
+      <div class="hoje-nav">
+        <button type="button" class="hoje-nav-btn" id="hoje-prev" title="Dia anterior">‹</button>
+        <input type="date" id="hoje-date" value="${dk}" title="Escolher o dia">
+        <button type="button" class="hoje-nav-btn" id="hoje-next" title="Próximo dia">›</button>
+        ${ehHoje?'':`<button type="button" class="btn-ghost" id="hoje-voltar" style="padding:4px 8px;font-size:12.5px;">Hoje</button>`}
+      </div>
+    </div>`;
+
+  function ligarNavegacao(){
+    const prev = alvo.querySelector('#hoje-prev');
+    const next = alvo.querySelector('#hoje-next');
+    const inp = alvo.querySelector('#hoje-date');
+    const volta = alvo.querySelector('#hoje-voltar');
+    if(prev) prev.addEventListener('click', ()=>{ painelDate = pulaFimDeSemana(dia, -1); renderHojePainelAsync(); });
+    if(next) next.addEventListener('click', ()=>{ painelDate = pulaFimDeSemana(dia, 1); renderHojePainelAsync(); });
+    if(volta) volta.addEventListener('click', ()=>{ painelDate = null; renderHojePainelAsync(); });
+    if(inp) inp.addEventListener('change', ()=>{
+      if(!inp.value) return;
+      const [y,m,d2] = inp.value.split('-').map(Number);
+      painelDate = new Date(y, m-1, d2);
+      renderHojePainelAsync();
+    });
+  }
+
+  if(profs.length===0){
+    alvo.innerHTML = `<div class="hoje-box">${cabecalho}<div class="hoje-vazio">Nenhuma profissional cadastrada.</div></div>`;
+    ligarNavegacao();
+    return;
+  }
+
+  const blocos = [];
+  for(const prof of profs){
+    let slots = [];
+    try{ slots = await loadAppts(prof.id, dk); }
+    catch(e){ slots = apptsCache[prof.id+'|'+dk] || []; }
+    const livres = slots.filter(s=>!(s.paciente && s.paciente.trim())).length;
+    const chips = slots.map(s=>{
+      const ocupado = !!(s.paciente && s.paciente.trim());
+      return `<button type="button" class="hoje-slot ${ocupado?'cheio':'livre'}" data-hoje-prof="${prof.id}" title="${ocupado?s.paciente.replace(/"/g,'&quot;'):'Horário livre'}">
+        <span class="hs-h mono">${s.horarioInicio} – ${s.horarioFim}</span><span class="hs-v">${ocupado?s.paciente.replace(/</g,'&lt;'):'livre'}</span>
+      </button>`;
+    }).join('');
+    const corpo = slots.length
+      ? `<div class="hoje-slots">${chips}</div>`
+      : `<div class="hoje-vazio">Nenhum horário criado para este dia.</div>`;
+    blocos.push(`
+      <div class="hoje-prof">
+        <div class="hoje-prof-head">
+          <div class="li-main">
+            <div class="avatar">${initials(prof.nome)}</div>
+            <div class="li-info">
+              <div class="li-title">${prof.nome}</div>
+              <div class="li-sub">${slots.length} horário${slots.length===1?'':'s'} · <strong style="color:${livres?'var(--success)':'var(--muted)'};">${livres} livre${livres===1?'':'s'}</strong></div>
+            </div>
+          </div>
+          <button class="btn-secondary" data-hoje-abrir="${prof.id}" style="padding:7px 11px;font-size:12.5px;">Abrir agenda</button>
+        </div>
+        ${corpo}
+      </div>`);
+  }
+
+  alvo.innerHTML = `<div class="hoje-box">${cabecalho}${blocos.join('')}</div>`;
+  ligarNavegacao();
+
+  alvo.querySelectorAll('[data-hoje-abrir], .hoje-slot').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const pid = el.dataset.hojeAbrir || el.dataset.hojeProf;
+      view.selectedDate = new Date(dia.getFullYear(), dia.getMonth(), dia.getDate());
+      view.selectedProfId = pid;
+      view.screen = 'day';
+      view.multiProfDay = profs.length>1;
+      render();
+      renderDayViewAsync();
+    });
+  });
 }
 
 function renderProfSelectView(){
@@ -447,8 +592,25 @@ function renderProfSelectView(){
     <button class="back-link" id="back-to-cal">← Voltar ao calendário</button>
     <h3 class="day-title">${dateLabel}</h3>
     <p class="day-sub">Escolha a profissional para ver os horários.</p>
-    ${cards}
+    <div class="list-grid">${cards}</div>
   `;
+}
+
+// Mantém a agenda do dia atualizada sozinha: a cada 8s busca de novo no servidor
+// e só redesenha se ninguém estiver digitando naquele instante (pra não apagar o
+// que a pessoa está escrevendo). Para sozinho ao sair da tela do dia.
+function startDayPoll(){
+  if(dayPollTimer){ clearInterval(dayPollTimer); dayPollTimer = null; }
+  dayPollTimer = setInterval(async ()=>{
+    if(!(view.tab==='agenda' && view.screen==='day' && view.selectedDate && view.selectedProfId)){
+      clearInterval(dayPollTimer); dayPollTimer = null; return;
+    }
+    const ae = document.activeElement;
+    const digitando = ae && (ae.classList.contains('pat-input') || ae.classList.contains('obs-input') || ae.classList.contains('slot-time-input') || ae.id==='ns-inicio' || ae.id==='ns-fim' || ae.id==='ns-paciente');
+    if(digitando) return;
+    if(document.getElementById('add-slot-form')) return; // formulário de novo horário aberto
+    try{ await renderDayViewAsync(); }catch(e){ /* tenta de novo no próximo ciclo */ }
+  }, 8000);
 }
 
 async function renderDayViewAsync(){
@@ -500,6 +662,7 @@ async function renderDayViewAsync(){
     ${renderPrintArea(prof, dateLabel, slots)}
   `;
   attachAgendaHandlers();
+  startDayPoll();
 }
 
 function renderPrintArea(prof, dateLabel, slots){
@@ -639,6 +802,61 @@ function attachAgendaHandlers(){
   // imprimir agenda do dia
   const printBtn = document.getElementById('print-agenda-btn');
   if(printBtn) printBtn.addEventListener('click', ()=>window.print());
+
+  // imprimir as agendas de TODAS as profissionais (dia mostrado no painel)
+  const printAllBtn = document.getElementById('open-print-all-btn');
+  if(printAllBtn) printAllBtn.addEventListener('click', async ()=>{
+    printAllBtn.disabled = true; printAllBtn.textContent = 'Gerando…';
+    try{ await printAllSchedules(); }
+    catch(err){ alert(err.message); }
+    printAllBtn.disabled = false; printAllBtn.textContent = '🖨️ Imprimir agendas do dia';
+  });
+
+  // se estamos no calendário, carrega o painel de vagas do dia
+  if(document.getElementById('hoje-painel')) renderHojePainelAsync();
+}
+
+// Junta as agendas de todas as profissionais do dia mostrado no painel
+// numa impressão só — cada profissional começando numa folha nova.
+async function printAllSchedules(){
+  const hojeReal = new Date();
+  const dia = painelDate ? new Date(painelDate) : new Date(hojeReal.getFullYear(), hojeReal.getMonth(), hojeReal.getDate());
+  const dk = dateKey(dia);
+  const dateLabel = cap(dia.toLocaleDateString('pt-BR',{weekday:'long', day:'2-digit', month:'long', year:'numeric'}));
+  const profs = visibleProfessionals();
+  if(profs.length===0) throw new Error('Nenhuma profissional cadastrada.');
+
+  const secoes = [];
+  for(const prof of profs){
+    let slots = [];
+    try{ slots = await loadAppts(prof.id, dk); }catch(e){ slots = []; }
+    const rows = slots.map(s=>`
+      <tr>
+        <td class="mono">${s.horarioInicio} – ${s.horarioFim}</td>
+        <td>${(s.paciente||'').replace(/</g,'&lt;') || '<span style="color:#999;">livre</span>'}</td>
+        <td>${(s.obs||'').replace(/</g,'&lt;')}</td>
+      </tr>`).join('');
+    const body = rows || `<tr><td colspan="3" style="text-align:center;color:#888;">Nenhum horário criado para este dia.</td></tr>`;
+    secoes.push(`
+      <div class="p-section">
+        <h2 style="font-family:'Fraunces',serif;margin-bottom:2px;">PsiAgenda</h2>
+        <div style="font-size:15px;font-weight:600;">${prof.nome}</div>
+        <div style="font-size:13px;color:#555;margin-bottom:6px;">${dateLabel}</div>
+        <table>
+          <thead><tr><th>Horário</th><th>Paciente</th><th>Observações</th></tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>`);
+  }
+
+  let area = document.getElementById('print-area');
+  if(!area){
+    area = document.createElement('div');
+    area.id = 'print-area';
+    document.body.appendChild(area);
+  }
+  area.innerHTML = secoes.join('');
+  setTimeout(()=>window.print(), 100);
 }
 
 // Retorna as N datas (objetos Date) da mesma repetição semanal a partir de baseDate,
@@ -808,7 +1026,7 @@ function renderProfissionaisTab(){
 
   return `
     <div class="section-title"><h3>Profissionais</h3>${isAdmin?'<button class="add-btn" id="add-prof-btn">+ Nova</button>':''}</div>
-    ${cards}
+    <div class="list-grid">${cards}</div>
   `;
 }
 function attachProfissionaisHandlers(){
@@ -917,7 +1135,7 @@ function renderUsuariosTab(){
   return `
     <div class="note-box">📊 O banco de dados deste app é o Supabase — profissionais, usuários e horários ficam gravados lá.</div>
     <div class="section-title"><h3>Usuários</h3><button class="add-btn" id="add-user-btn">+ Novo</button></div>
-    ${cards}
+    <div class="list-grid">${cards}</div>
   `;
 }
 function attachUsuariosHandlers(){
