@@ -169,9 +169,16 @@
   .hoje-nav-btn:hover{border-color:var(--primary);}
   .hoje-nav input[type=date]{border:1.5px solid var(--line);border-radius:8px;padding:5px 8px;font-size:12.5px;font-family:inherit;color:var(--text);background:var(--surface);}
   .hoje-load,.hoje-vazio{color:var(--muted);font-size:13px;padding:4px 0;}
-  .hoje-prof + .hoje-prof{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;}
-  .hoje-prof-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
-  .hoje-slots{display:flex;flex-wrap:wrap;gap:7px;}
+  /* lista rolável: com muitas profissionais o painel não empurra o calendário pra baixo */
+  .hoje-lista{max-height:330px;overflow-y:auto;padding-right:4px;}
+  .hoje-prof + .hoje-prof{border-top:1px solid var(--line);margin-top:8px;padding-top:8px;}
+  .hoje-prof-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  .hoje-prof-head .avatar{width:24px;height:24px;font-size:10.5px;}
+  .hoje-prof-head .li-main{gap:8px;}
+  .hoje-prof-head .li-title{font-size:13.5px;}
+  .hoje-prof-head .li-sub{font-size:11.5px;margin-top:0;}
+  .hoje-sem{font-size:11.5px;color:var(--muted);}
+  .hoje-slots{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;}
   .hoje-slot{display:flex;flex-direction:column;align-items:flex-start;gap:1px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface-2);padding:6px 10px;min-width:96px;text-align:left;}
   .hoje-slot .hs-h{font-size:12.5px;font-weight:700;color:var(--primary-dark);}
   .hoje-slot .hs-v{font-size:10.5px;color:var(--muted);font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -545,11 +552,15 @@ async function renderHojePainelAsync(){
     return;
   }
 
+  // busca a agenda de todas ao mesmo tempo (bem mais rápido com muitas profissionais)
+  const agendas = await Promise.all(profs.map(async p=>{
+    try{ return await loadAppts(p.id, dk); }
+    catch(e){ return apptsCache[p.id+'|'+dk] || []; }
+  }));
+
   const blocos = [];
-  for(const prof of profs){
-    let slots = [];
-    try{ slots = await loadAppts(prof.id, dk); }
-    catch(e){ slots = apptsCache[prof.id+'|'+dk] || []; }
+  profs.forEach((prof, idx)=>{
+    const slots = agendas[idx] || [];
     const livres = slots.filter(s=>!(s.paciente && s.paciente.trim())).length;
     const chips = slots.map(s=>{
       const ocupado = !!(s.paciente && s.paciente.trim());
@@ -557,9 +568,10 @@ async function renderHojePainelAsync(){
         <span class="hs-h mono">${s.horarioInicio} – ${s.horarioFim}</span><span class="hs-v">${ocupado?s.paciente.replace(/</g,'&lt;'):'livre'}</span>
       </button>`;
     }).join('');
-    const corpo = slots.length
-      ? `<div class="hoje-slots">${chips}</div>`
-      : `<div class="hoje-vazio">Nenhum horário criado para este dia.</div>`;
+    // quem não tem horário no dia ocupa só uma linha, sem bloco extra
+    const resumo = slots.length
+      ? `${slots.length} horário${slots.length===1?'':'s'} · <strong style="color:${livres?'var(--success)':'var(--muted)'};">${livres} livre${livres===1?'':'s'}</strong>`
+      : `<span class="hoje-sem">sem horários neste dia</span>`;
     blocos.push(`
       <div class="hoje-prof">
         <div class="hoje-prof-head">
@@ -567,16 +579,16 @@ async function renderHojePainelAsync(){
             <div class="avatar">${initials(prof.nome)}</div>
             <div class="li-info">
               <div class="li-title">${prof.nome}</div>
-              <div class="li-sub">${slots.length} horário${slots.length===1?'':'s'} · <strong style="color:${livres?'var(--success)':'var(--muted)'};">${livres} livre${livres===1?'':'s'}</strong></div>
+              <div class="li-sub">${resumo}</div>
             </div>
           </div>
-          <button class="btn-secondary" data-hoje-abrir="${prof.id}" style="padding:7px 11px;font-size:12.5px;">Abrir agenda</button>
+          <button class="btn-secondary" data-hoje-abrir="${prof.id}" style="padding:5px 9px;font-size:11.5px;">Abrir</button>
         </div>
-        ${corpo}
+        ${slots.length ? `<div class="hoje-slots">${chips}</div>` : ''}
       </div>`);
-  }
+  });
 
-  alvo.innerHTML = `<div class="hoje-box">${cabecalho}${blocos.join('')}</div>`;
+  alvo.innerHTML = `<div class="hoje-box">${cabecalho}<div class="hoje-lista">${blocos.join('')}</div></div>`;
   ligarNavegacao();
 
   alvo.querySelectorAll('[data-hoje-abrir], .hoje-slot').forEach(el=>{
